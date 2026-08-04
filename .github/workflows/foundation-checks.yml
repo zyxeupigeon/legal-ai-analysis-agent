@@ -1,4 +1,4 @@
-name: P1 Foundation Checks
+name: P2.1 Checks
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  foundation:
+  repository-guards:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,23 +17,21 @@ jobs:
       - name: Check whitespace and repository state
         run: git diff --check
 
-      - name: Check required foundation files
+      - name: Check required files and frozen values
         shell: bash
         run: |
           set -euo pipefail
           for path in README.md PROJECT_STRUCTURE.md VERSION_MANIFEST.yaml CHANGELOG.md .gitignore .env.example CONTRIBUTING.md SECURITY.md NOTICE.md; do
             test -f "$path" || { echo "Missing $path"; exit 1; }
           done
-
-      - name: Check P1 frozen values
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -Fq 'project_phase: "P1"' VERSION_MANIFEST.yaml
+          grep -Fq 'project_phase: "P2.1"' VERSION_MANIFEST.yaml
           grep -Fq 'repository_visibility: "private"' VERSION_MANIFEST.yaml
           grep -Fq 'agent_core: "1.1"' VERSION_MANIFEST.yaml
-          grep -Fq 'business_code_allowed: false' VERSION_MANIFEST.yaml
+          grep -Fq 'business_code_allowed: true' VERSION_MANIFEST.yaml
           grep -Fq 'real_secrets_allowed: false' VERSION_MANIFEST.yaml
+          grep -Fq 'database_allowed: false' VERSION_MANIFEST.yaml
+          grep -Fq 'real_model_calls_allowed: false' VERSION_MANIFEST.yaml
+          grep -Fq 'training_allowed: false' VERSION_MANIFEST.yaml
           grep -Fq 'openai_store_responses: false' VERSION_MANIFEST.yaml
 
       - name: Block likely secrets and runtime materials
@@ -41,17 +39,38 @@ jobs:
         run: |
           set -euo pipefail
           forbidden='(^|/)(\.env|secrets?|uploads?|downloads?|reports|runtime|logs?)(/|$)|\.(pem|p12|pfx|sqlite3?|dump|backup|log|docx|pdf)$'
-          if git ls-files | grep -E "$forbidden" | grep -Ev '^\.env\.example$'; then
+          if git ls-files | grep -E "$forbidden" | grep -Ev '(^|/)\.env\.(example|local\.example)$'; then
             echo 'Forbidden secret or runtime material is tracked.'
             exit 1
           fi
 
-      - name: Keep P1 free of business implementation
-        shell: bash
-        run: |
-          set -euo pipefail
-          if find apps services agent database scripts -type f \
-            ! -name '.gitkeep' ! -name 'README.md' | grep -q .; then
-            echo 'P1 directories contain implementation files. Advance the phase deliberately before adding code.'
-            exit 1
-          fi
+      - name: Verify frozen baseline hashes
+        run: python scripts/check_baselines.py
+
+  api-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/api/requirements.txt
+      - run: pip install -r services/api/requirements.txt
+      - run: python -m pytest -q
+
+  web-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - working-directory: apps/web
+        run: npm ci
+      - working-directory: apps/web
+        run: npm run typecheck
+      - working-directory: apps/web
+        run: npm run build

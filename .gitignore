@@ -45,6 +45,7 @@ venv/
 # Node and frontend
 node_modules/
 .next/
+*.tsbuildinfo
 out/
 dist/
 coverage/
