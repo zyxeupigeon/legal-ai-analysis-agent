@@ -1,7 +1,7 @@
 [project]
 name = "legal-ai-analysis-agent-api"
-version = "0.2.1"
-description = "P2.2 provider-neutral legal AI identity research with public web search"
+version = "0.2.2"
+description = "P2.2.1 mainland-friendly legal AI identity research test build"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi==0.141.1",
