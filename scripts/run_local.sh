@@ -19,7 +19,11 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 cd "$repo_root"
-"$repo_root/.venv/bin/uvicorn" services.api.app.main:app --port 8000 &
+uvicorn_args=(services.api.app.main:app --port 8000)
+if [[ -f "$repo_root/.env" ]]; then
+  uvicorn_args+=(--env-file "$repo_root/.env")
+fi
+"$repo_root/.venv/bin/uvicorn" "${uvicorn_args[@]}" &
 api_pid=$!
 
 cd "$repo_root/apps/web"

@@ -1,10 +1,14 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from services.api.app.main import app, store
+from services.api.app.identity_provider import FixtureIdentityResearchProvider
+from services.api.app.identity_provider import OpenAIProviderSettings, OpenAIResponsesIdentityProvider
+from services.api.app.main import create_app
+from services.api.app.store import InMemoryTaskStore
 
 
-client = TestClient(app)
+store = InMemoryTaskStore()
+client = TestClient(create_app(FixtureIdentityResearchProvider(), store))
 
 
 @pytest.fixture(autouse=True)
@@ -16,14 +20,17 @@ def create(product_name: str):
     return client.post("/api/tasks", json={"product_name": product_name})
 
 
-def test_health_declares_local_mock_mode() -> None:
+def test_health_declares_explicit_fixture_mode() -> None:
     response = client.get("/api/health")
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "app_version": "0.1.0",
+        "app_version": "0.2.0",
         "storage_mode": "memory_only",
         "classifier_mode": "deterministic_fixture",
+        "provider_ready": True,
+        "model_name": None,
+        "message": "显式测试模式：使用虚构确定性数据，不代表真实公开检索。",
     }
 
 
@@ -75,16 +82,17 @@ def test_non_legal_candidate_terminates() -> None:
     assert response.json()["identity_gate"] == "rejected"
 
 
-def test_user_can_supply_exact_name_without_fake_operator_facts() -> None:
+def test_user_exact_name_is_researched_again_and_can_remain_ambiguous() -> None:
     task = create("未收录产品名称").json()
     response = client.post(
         f"/api/tasks/{task['task_id']}/clarifications",
         json={"confirmed_product_name": "用户确认的产品全称"},
     )
     clarified = response.json()
-    assert clarified["identity_gate"] == "confirmed"
+    assert clarified["identity_gate"] == "awaiting_user"
     assert clarified["operator_name"] is None
-    assert clarified["product_type"] == "用户确认的法律AI产品（待公开核验）"
+    assert clarified["product_type"] is None
+    assert len(clarified["events"]) == 1
 
 
 def test_out_of_scope_product_terminates_without_report_work() -> None:
@@ -118,3 +126,18 @@ def test_task_list_and_read() -> None:
 
 def test_missing_task_returns_404() -> None:
     assert client.get("/api/tasks/not-found").status_code == 404
+
+
+def test_missing_key_is_visible_and_does_not_create_a_task() -> None:
+    isolated_store = InMemoryTaskStore()
+    provider = OpenAIResponsesIdentityProvider(OpenAIProviderSettings(api_key=""))
+    isolated_client = TestClient(create_app(provider, isolated_store))
+
+    health = isolated_client.get("/api/health").json()
+    assert health["status"] == "needs_configuration"
+    assert health["provider_ready"] is False
+
+    response = isolated_client.post("/api/tasks", json={"product_name": "任意产品"})
+    assert response.status_code == 503
+    assert "OPENAI_API_KEY" in response.json()["detail"]
+    assert isolated_store.list() == []

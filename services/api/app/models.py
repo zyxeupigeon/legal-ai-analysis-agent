@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -25,9 +26,64 @@ class IdentityGate(StrEnum):
 class Candidate(BaseModel):
     id: str
     product_name: str
-    operator_name: str
-    product_type: str
-    is_legal_ai: bool
+    operator_name: str | None = None
+    product_type: str | None = None
+    is_legal_ai: bool | None = None
+    source_urls: list[str] = Field(default_factory=list)
+
+
+class EvidenceSource(BaseModel):
+    url: str
+    title: str
+    source_type: Literal[
+        "government",
+        "regulator",
+        "official_product",
+        "official_docs",
+        "official_terms",
+        "official_company",
+        "industry",
+        "research",
+        "media",
+        "other",
+    ]
+    supports: list[Literal["identity", "operator", "legal_ai_scope", "ecosystem", "api", "mcp"]]
+
+
+class RelatedProduct(BaseModel):
+    name: str
+    kind: Literal[
+        "product",
+        "api",
+        "mcp",
+        "model_platform",
+        "developer_platform",
+        "database",
+        "knowledge_base",
+        "agent",
+        "plugin",
+        "connector",
+        "skill",
+        "other",
+    ]
+    relationship: str
+    verification_status: Literal["confirmed", "lead_only", "not_publicly_verified"]
+    source_urls: list[str] = Field(default_factory=list)
+
+
+class IdentityResearchResult(BaseModel):
+    outcome: Literal["clear", "ambiguous", "rejected"]
+    canonical_product_name: str | None
+    operator_name: str | None
+    product_type: str | None
+    is_legal_ai: bool | None
+    clarification_question: str | None
+    candidates: list[Candidate]
+    related_products: list[RelatedProduct]
+    sources: list[EvidenceSource]
+    summary: str
+    limitations: list[str]
+    web_search_used: bool = False
 
 
 class TaskEvent(BaseModel):
@@ -76,6 +132,11 @@ class Task(BaseModel):
     clarification_question: str | None = None
     candidates: list[Candidate] = Field(default_factory=list)
     related_product_hints: list[str] = Field(default_factory=list)
+    related_products: list[RelatedProduct] = Field(default_factory=list)
+    sources: list[EvidenceSource] = Field(default_factory=list)
+    research_summary: str | None = None
+    limitations: list[str] = Field(default_factory=list)
+    web_search_used: bool = False
     status_message: str
     next_action: str | None = None
     phase_limit_reached: bool = False
@@ -86,7 +147,8 @@ class Task(BaseModel):
     workflow_version: str = "1.1"
     skill_name: str = "legal-report-review-and-verification"
     storage_mode: str = "memory_only"
-    classifier_mode: str = "deterministic_fixture"
+    classifier_mode: str = "openai_web_search"
+    model_name: str | None = None
 
 
 class HealthResponse(BaseModel):
@@ -94,3 +156,6 @@ class HealthResponse(BaseModel):
     app_version: str
     storage_mode: str
     classifier_mode: str
+    provider_ready: bool
+    model_name: str | None = None
+    message: str

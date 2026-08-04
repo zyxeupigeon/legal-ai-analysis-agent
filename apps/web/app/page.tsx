@@ -5,9 +5,33 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 type Candidate = {
   id: string;
   product_name: string;
-  operator_name: string;
-  product_type: string;
-  is_legal_ai: boolean;
+  operator_name: string | null;
+  product_type: string | null;
+  is_legal_ai: boolean | null;
+  source_urls: string[];
+};
+
+type EvidenceSource = {
+  url: string;
+  title: string;
+  source_type: string;
+  supports: string[];
+};
+
+type RelatedProduct = {
+  name: string;
+  kind: string;
+  relationship: string;
+  verification_status: string;
+  source_urls: string[];
+};
+
+type Health = {
+  status: string;
+  classifier_mode: string;
+  provider_ready: boolean;
+  model_name: string | null;
+  message: string;
 };
 
 type TaskEvent = {
@@ -29,6 +53,11 @@ type Task = {
   clarification_question: string | null;
   candidates: Candidate[];
   related_product_hints: string[];
+  related_products: RelatedProduct[];
+  sources: EvidenceSource[];
+  research_summary: string | null;
+  limitations: string[];
+  web_search_used: boolean;
   status_message: string;
   next_action: string | null;
   phase_limit_reached: boolean;
@@ -64,6 +93,7 @@ export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [health, setHealth] = useState<Health | null>(null);
 
   const taskCount = useMemo(() => tasks.length, [tasks]);
 
@@ -78,6 +108,7 @@ export default function Home() {
 
   useEffect(() => {
     void refreshTasks();
+    void request<Health>("/api/health").then(setHealth).catch(() => setHealth(null));
   }, []);
 
   async function submitProduct(event: FormEvent) {
@@ -127,12 +158,12 @@ export default function Home() {
       <section className="hero">
         <div className="eyebrow">LEGAL AI PRODUCT INTELLIGENCE</div>
         <h1>先确认产品，<br />再开始分析。</h1>
-        <p className="hero-copy">单用户本地最小闭环 · Agent核心 V1.1</p>
+        <p className="hero-copy">单用户本地真实身份检索 · Agent核心 V1.1</p>
         <div className="phase-strip" aria-label="当前实现进度">
           <span className="phase active">01 产品输入</span>
           <span className="phase active">02 身份闸门</span>
           <span className="phase active">03 澄清确认</span>
-          <span className="phase muted">04 公开研究</span>
+          <span className="phase active">04 公开检索</span>
           <span className="phase muted">05 Word报告</span>
         </div>
       </section>
@@ -161,24 +192,26 @@ export default function Home() {
             </div>
           </form>
           <div className="test-note">
-            <strong>本地测试名称</strong>
-            <span>衡法智研（明确）</span>
-            <span>星云助手（需澄清）</span>
-            <span>晴空天气（越界）</span>
+            <strong>真实检索</strong>
+            <span>会调用OpenAI并检索公开网页</span>
+            <span>一次识别可能产生少量API费用</span>
           </div>
           {error && <p className="error" role="alert">{error}</p>}
         </section>
 
         <aside className="panel scope-panel">
-          <span className="label">P2.1 范围</span>
-          <h2>边界被写进流程</h2>
+          <span className="label">P2.2 范围</span>
+          <h2>先核验，再给结论</h2>
           <ul>
             <li>名称不清楚，就停下询问</li>
-            <li>确认前不扩展产品生态</li>
+            <li>确认前不扩展同企业生态</li>
             <li>非法律AI产品直接终止</li>
-            <li>不建库、不训练、不调用真实模型</li>
+            <li>API、MCP和插件分别核验</li>
+            <li>不建库、不训练、不生成报告</li>
           </ul>
-          <div className="local-pill"><span /> 本地内存模式 · 重启即清空</div>
+          <div className={`local-pill ${health?.provider_ready ? "" : "not-ready"}`}>
+            <span /> {health?.message ?? "正在检查本地API与检索配置…"}
+          </div>
         </aside>
       </div>
 
@@ -206,8 +239,8 @@ export default function Home() {
                       onClick={() => void clarify({ candidate_id: candidate.id })}
                     >
                       <strong>{candidate.product_name}</strong>
-                      <span>{candidate.operator_name}</span>
-                      <small>{candidate.product_type}</small>
+                      <span>{candidate.operator_name ?? "运营主体待核验"}</span>
+                      <small>{candidate.product_type ?? "产品类型待核验"}</small>
                     </button>
                   ))}
                 </div>
@@ -239,15 +272,51 @@ export default function Home() {
             </dl>
           )}
 
-          {currentTask.related_product_hints.length > 0 && (
+          {currentTask.research_summary && (
+            <div className="research-summary">
+              <h3>身份核验摘要</h3>
+              <p>{currentTask.research_summary}</p>
+            </div>
+          )}
+
+          {currentTask.related_products.length > 0 && (
             <div className="related">
-              <h3>后续需一并核验的关联线索</h3>
-              {currentTask.related_product_hints.map((item) => <span key={item}>{item}</span>)}
+              <h3>同企业AI产品与技术入口线索</h3>
+              <div className="related-grid">
+                {currentTask.related_products.map((item, index) => (
+                  <article key={`${item.name}-${index}`}>
+                    <div><strong>{item.name}</strong><span>{item.kind}</span></div>
+                    <p>{item.relationship}</p>
+                    <small>{item.verification_status === "confirmed" ? "已由公开来源确认" : "仅为待复核线索"}</small>
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {currentTask.sources.length > 0 && (
+            <div className="sources">
+              <h3>本次核验使用的公开来源</h3>
+              <ol>
+                {currentTask.sources.map((source, index) => (
+                  <li key={`${source.url}-${index}`}>
+                    <a href={source.url} target="_blank" rel="noreferrer">{source.title}</a>
+                    <small>{source.source_type} · 支持：{source.supports.join("、")}</small>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {currentTask.limitations.length > 0 && (
+            <div className="limitations">
+              <h3>限制与未确认事项</h3>
+              <ul>{currentTask.limitations.map((item) => <li key={item}>{item}</li>)}</ul>
             </div>
           )}
 
           {currentTask.phase_limit_reached && (
-            <div className="phase-limit"><strong>P2.1 已到达阶段终点</strong><span>{currentTask.next_action}</span></div>
+            <div className="phase-limit"><strong>P2.2 已到达阶段终点</strong><span>{currentTask.next_action}</span></div>
           )}
           <p className="task-id">任务 ID · {currentTask.task_id}</p>
         </section>
@@ -272,7 +341,7 @@ export default function Home() {
         )}
       </section>
 
-      <footer>法律AI分析Agent · 本页面仅验证身份闸门与状态流转，不提供法律意见。</footer>
+      <footer>法律AI分析Agent · 本页面只做公开身份与生态线索核验，不提供法律意见或正式报告。</footer>
     </main>
   );
 }
