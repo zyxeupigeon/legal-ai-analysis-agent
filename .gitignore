@@ -1,0 +1,61 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# Runtime data and user materials
+artifacts/local/**
+!artifacts/local/.gitkeep
+tmp/**
+!tmp/.gitkeep
+runtime/
+uploads/
+downloads/
+reports/
+source_snapshots/
+training_exports/
+evaluations/results/**
+!evaluations/results/.gitkeep
+evaluations/fixtures/private/**
+!evaluations/fixtures/private/.gitkeep
+
+# Databases, backups and logs
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+*.log
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node and frontend
+node_modules/
+.next/
+out/
+dist/
+coverage/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Office and render temporaries
+~$*
+*.tmp
+*.temp

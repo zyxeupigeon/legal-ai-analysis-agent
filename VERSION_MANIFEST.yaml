@@ -1,0 +1,39 @@
+manifest_version: "1.0"
+project_phase: "P1"
+repository_visibility: "private"
+repository_owner_type: "personal"
+
+baselines:
+  agent_core: "1.1"
+  system_prompt: "1.1"
+  workflow: "1.1"
+  knowledge_feedback_design: "1.0"
+  data_dictionary: "1.0"
+  technology_deployment_plan: "1.0"
+  implementation_preparation_plan: "1.0"
+
+skill:
+  name: "legal-report-review-and-verification"
+  pin_status: "identified_not_yet_vendored"
+  source_sha256: "b116c96ec1f756e9a9993f3e637fd6b8d44bf21094e85e59233e22517f2af84b"
+
+implementation:
+  app_version: "not_started"
+  api_contract_version: "not_started"
+  event_contract_version: "not_started"
+  database_schema_version: "not_started"
+  report_template_version: "not_started"
+  evaluation_set_version: "not_started"
+
+data_policy:
+  test_data: "public_or_irreversibly_desensitized_only"
+  external_services_allowed: true
+  openai_store_responses: false
+  public_signup: false
+  training_export: false
+
+p1_guards:
+  business_code_allowed: false
+  real_secrets_allowed: false
+  user_materials_allowed: false
+  deployment_allowed: false

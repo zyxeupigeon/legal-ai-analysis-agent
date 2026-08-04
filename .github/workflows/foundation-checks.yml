@@ -1,0 +1,57 @@
+name: P1 Foundation Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check whitespace and repository state
+        run: git diff --check
+
+      - name: Check required foundation files
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in README.md PROJECT_STRUCTURE.md VERSION_MANIFEST.yaml CHANGELOG.md .gitignore .env.example CONTRIBUTING.md SECURITY.md NOTICE.md; do
+            test -f "$path" || { echo "Missing $path"; exit 1; }
+          done
+
+      - name: Check P1 frozen values
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'project_phase: "P1"' VERSION_MANIFEST.yaml
+          grep -Fq 'repository_visibility: "private"' VERSION_MANIFEST.yaml
+          grep -Fq 'agent_core: "1.1"' VERSION_MANIFEST.yaml
+          grep -Fq 'business_code_allowed: false' VERSION_MANIFEST.yaml
+          grep -Fq 'real_secrets_allowed: false' VERSION_MANIFEST.yaml
+          grep -Fq 'openai_store_responses: false' VERSION_MANIFEST.yaml
+
+      - name: Block likely secrets and runtime materials
+        shell: bash
+        run: |
+          set -euo pipefail
+          forbidden='(^|/)(\.env|secrets?|uploads?|downloads?|reports|runtime|logs?)(/|$)|\.(pem|p12|pfx|sqlite3?|dump|backup|log|docx|pdf)$'
+          if git ls-files | grep -E "$forbidden" | grep -Ev '^\.env\.example$'; then
+            echo 'Forbidden secret or runtime material is tracked.'
+            exit 1
+          fi
+
+      - name: Keep P1 free of business implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find apps services agent database scripts -type f \
+            ! -name '.gitkeep' ! -name 'README.md' | grep -q .; then
+            echo 'P1 directories contain implementation files. Advance the phase deliberately before adding code.'
+            exit 1
+          fi

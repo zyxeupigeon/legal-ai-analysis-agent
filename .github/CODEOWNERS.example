@@ -1,0 +1,8 @@
+# 创建远程仓库并确认GitHub用户名后，将 OWNER 替换为真实账号，
+# 再把本文件重命名为 CODEOWNERS。
+* @OWNER
+/agent/core/ @OWNER
+/agent/skills/ @OWNER
+/database/ @OWNER
+/.github/workflows/ @OWNER
+/deployment/ @OWNER
