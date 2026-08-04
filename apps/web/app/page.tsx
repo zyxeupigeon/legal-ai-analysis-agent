@@ -31,6 +31,8 @@ type Health = {
   classifier_mode: string;
   provider_ready: boolean;
   model_name: string | null;
+  model_provider: string;
+  search_provider: string;
   message: string;
 };
 
@@ -193,8 +195,8 @@ export default function Home() {
           </form>
           <div className="test-note">
             <strong>真实检索</strong>
-            <span>会调用OpenAI并检索公开网页</span>
-            <span>一次识别可能产生少量API费用</span>
+            <span>模型与公开网页搜索可以分别替换</span>
+            <span>当前：{health ? `${health.model_provider} + ${health.search_provider}` : "正在读取配置"}</span>
           </div>
           {error && <p className="error" role="alert">{error}</p>}
         </section>

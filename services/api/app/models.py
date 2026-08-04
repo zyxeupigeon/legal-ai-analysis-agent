@@ -158,4 +158,6 @@ class HealthResponse(BaseModel):
     classifier_mode: str
     provider_ready: bool
     model_name: str | None = None
+    model_provider: str
+    search_provider: str
     message: str
