@@ -1,5 +1,5 @@
 manifest_version: "1.1"
-project_phase: "P2.1"
+project_phase: "P2.2"
 repository_visibility: "private"
 repository_owner_type: "personal"
 
@@ -23,8 +23,8 @@ frozen_files:
   task_boundary_docx_sha256: "aacb93d6ff99c551bbe11fa8258f89eacf3858f106b447d85478d8f43a29379d"
 
 implementation:
-  app_version: "0.1.0"
-  api_contract_version: "0.1.0"
+  app_version: "0.2.0"
+  api_contract_version: "0.2.0"
   event_contract_version: "0.1.0"
   database_schema_version: "not_started"
   report_template_version: "not_started"
@@ -37,12 +37,14 @@ data_policy:
   public_signup: false
   training_export: false
 
-p2_1_guards:
+p2_2_guards:
   business_code_allowed: true
   real_secrets_allowed: false
   user_materials_allowed: false
   deployment_allowed: false
   database_allowed: false
   multi_user_allowed: false
-  real_model_calls_allowed: false
+  real_model_calls_allowed: true
+  public_web_research_allowed: true
+  report_generation_allowed: false
   training_allowed: false
