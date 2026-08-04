@@ -1,0 +1,20 @@
+[project]
+name = "legal-ai-analysis-agent-api"
+version = "0.1.0"
+description = "P2.1 local identity gate and task state API"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.141.1",
+  "uvicorn[standard]==0.52.1",
+]
+
+[project.optional-dependencies]
+test = [
+  "httpx==0.28.1",
+  "pytest==8.4.2",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["."]
+testpaths = ["../../tests/unit", "../../tests/integration"]

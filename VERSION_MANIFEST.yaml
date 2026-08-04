@@ -1,5 +1,5 @@
-manifest_version: "1.0"
-project_phase: "P1"
+manifest_version: "1.1"
+project_phase: "P2.1"
 repository_visibility: "private"
 repository_owner_type: "personal"
 
@@ -14,16 +14,21 @@ baselines:
 
 skill:
   name: "legal-report-review-and-verification"
-  pin_status: "identified_not_yet_vendored"
+  pin_status: "vendored_and_hash_verified"
   source_sha256: "b116c96ec1f756e9a9993f3e637fd6b8d44bf21094e85e59233e22517f2af84b"
 
+frozen_files:
+  system_prompt_sha256: "44d8e51e7016a7d431a95b3f67e1b519102caf996a3a319593191c6319a24596"
+  workflow_sha256: "cdc56f3d285c94bbde54548d5efc91adbf184c2588db02bd684a172697dc6add"
+  task_boundary_docx_sha256: "aacb93d6ff99c551bbe11fa8258f89eacf3858f106b447d85478d8f43a29379d"
+
 implementation:
-  app_version: "not_started"
-  api_contract_version: "not_started"
-  event_contract_version: "not_started"
+  app_version: "0.1.0"
+  api_contract_version: "0.1.0"
+  event_contract_version: "0.1.0"
   database_schema_version: "not_started"
   report_template_version: "not_started"
-  evaluation_set_version: "not_started"
+  evaluation_set_version: "0.1.0"
 
 data_policy:
   test_data: "public_or_irreversibly_desensitized_only"
@@ -32,8 +37,12 @@ data_policy:
   public_signup: false
   training_export: false
 
-p1_guards:
-  business_code_allowed: false
+p2_1_guards:
+  business_code_allowed: true
   real_secrets_allowed: false
   user_materials_allowed: false
   deployment_allowed: false
+  database_allowed: false
+  multi_user_allowed: false
+  real_model_calls_allowed: false
+  training_allowed: false
