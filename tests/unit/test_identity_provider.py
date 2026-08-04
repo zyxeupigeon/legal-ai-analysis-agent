@@ -4,11 +4,13 @@ import httpx
 import pytest
 
 from services.api.app.identity_provider import (
+    ExternalSearchIdentityProvider,
     OpenAIProviderSettings,
     OpenAIResponsesIdentityProvider,
     ProviderNotConfigured,
     RESEARCH_JSON_SCHEMA,
 )
+from services.api.app.search_provider import SearchDocument
 
 
 def _response_payload(result: dict, *, include_search_call: bool = True) -> dict:
@@ -149,3 +151,128 @@ def test_missing_api_key_fails_without_silent_fixture_fallback() -> None:
     assert provider.ready is False
     with pytest.raises(ProviderNotConfigured, match="未配置OPENAI_API_KEY"):
         provider.research("任意产品")
+
+
+class _SequenceModel:
+    provider_name = "deepseek"
+    model_name = "test-model"
+    ready = True
+    readiness_message = "ready"
+
+    def __init__(self, results: list[dict]) -> None:
+        self.results = list(results)
+        self.prompts: list[str] = []
+
+    def generate_json(self, system_prompt: str, user_prompt: str) -> str:
+        self.prompts.append(user_prompt)
+        return json.dumps(self.results.pop(0), ensure_ascii=False)
+
+
+class _RecordedSearch:
+    provider_name = "recorded_search"
+    ready = True
+    readiness_message = "ready"
+
+    def __init__(self) -> None:
+        self.queries: list[str] = []
+
+    def search(self, query: str, *, max_results: int = 5) -> list[SearchDocument]:
+        self.queries.append(query)
+        if "MCP" in query or "开放平台" in query:
+            return [
+                SearchDocument(
+                    query=query,
+                    title="开发文档",
+                    url="https://official.example/api",
+                    content="公开法科公司提供法律API。",
+                )
+            ]
+        return [
+            SearchDocument(
+                query=query,
+                title="产品官网",
+                url="https://official.example/product",
+                content="公开法务助手由公开法科公司运营，是法律AI产品。",
+            )
+        ]
+
+
+def test_external_search_runs_ecosystem_only_after_clear_identity() -> None:
+    identity = _clear_result()
+    identity["related_products"] = []
+    identity["sources"].append(
+        {
+            "url": "https://official.example/product",
+            "title": "产品官网",
+            "source_type": "official_product",
+            "supports": ["identity", "operator", "legal_ai_scope"],
+        }
+    )
+    final = _clear_result()
+    final["sources"].append(
+        {
+            "url": "https://official.example/product",
+            "title": "产品官网",
+            "source_type": "official_product",
+            "supports": ["identity", "operator", "legal_ai_scope"],
+        }
+    )
+    final["sources"].append(
+        {
+            "url": "https://hallucinated.example/mcp",
+            "title": "不存在于搜索结果的MCP页面",
+            "source_type": "official_docs",
+            "supports": ["mcp"],
+        }
+    )
+    final["related_products"].append(
+        {
+            "name": "未经搜索发现的MCP",
+            "kind": "mcp",
+            "relationship": "模型声称存在",
+            "verification_status": "confirmed",
+            "source_urls": ["https://hallucinated.example/mcp"],
+        }
+    )
+    model = _SequenceModel([identity, final])
+    search = _RecordedSearch()
+    provider = ExternalSearchIdentityProvider(model, search)
+
+    result = provider.research("公开法务助手")
+
+    assert len(search.queries) == 4
+    assert len(model.prompts) == 2
+    assert result.outcome == "clear"
+    assert result.web_search_used is True
+    assert {source.url for source in result.sources} == {
+        "https://official.example/api",
+        "https://official.example/product",
+    }
+    mcp = next(item for item in result.related_products if item.kind == "mcp")
+    assert mcp.source_urls == []
+    assert mcp.verification_status == "lead_only"
+
+
+def test_external_search_stops_before_ecosystem_when_identity_is_ambiguous() -> None:
+    ambiguous = _clear_result()
+    ambiguous.update(
+        {
+            "outcome": "ambiguous",
+            "canonical_product_name": None,
+            "operator_name": None,
+            "product_type": None,
+            "is_legal_ai": None,
+            "clarification_question": "请确认具体产品。",
+            "candidates": [],
+            "related_products": [],
+        }
+    )
+    model = _SequenceModel([ambiguous])
+    search = _RecordedSearch()
+
+    result = ExternalSearchIdentityProvider(model, search).research("公开助手")
+
+    assert result.outcome == "ambiguous"
+    assert len(search.queries) == 2
+    assert len(model.prompts) == 1
+    assert result.related_products == []

@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-当前为 **P2.2：单用户本地真实身份检索**。已经接入OpenAI Responses API与公开网页检索，实现产品身份辨析、运营主体核验、歧义候选、越界终止，以及同企业相关AI产品、API和MCP等线索识别。
+当前为 **P2.2：单用户本地真实身份检索**。模型与公开网页搜索已经解耦：默认使用DeepSeek进行结构化判断、Tavily提供公开搜索证据，也保留OpenAI原生网页检索，并提供OpenAI兼容接口入口。系统已实现产品身份辨析、运营主体核验、歧义候选、越界终止，以及同企业相关AI产品、API和MCP等线索识别。
 
 任务仍只保存在内存中，重启API后清空。本阶段不包含数据库、部署、多用户、正式报告生成或训练。
 
@@ -21,39 +21,42 @@
 
 ## 小白启动方法
 
-首次使用，在仓库根目录依次执行：
+Windows PowerShell首次使用，在仓库根目录依次执行：
 
-```bash
+```powershell
 python -m venv .venv
-.venv/bin/pip install -r services/api/requirements.txt
-cd apps/web
+.\.venv\Scripts\python -m pip install -r services/api/requirements.txt
+Set-Location apps\web
 npm install
-cd ../..
-cp .env.example .env
+Set-Location ..\..
+Copy-Item .env.example .env
 ```
 
-用文本编辑器打开刚生成的 `.env`，只填写这一行：
+用记事本或VS Code打开刚生成的 `.env`，填写这两行：
 
 ```text
-OPENAI_API_KEY=你的OpenAI API密钥
+DEEPSEEK_API_KEY=你的DeepSeek API密钥
+TAVILY_API_KEY=你的Tavily API密钥
 ```
 
-`.env` 已被Git忽略，真实密钥不得发到聊天、提交到Git或写进前端代码。然后执行：
+`.env` 已被Git忽略，真实密钥不得发到聊天、提交到Git或写进前端代码。然后在PowerShell执行：
 
-```bash
-./scripts/run_local.sh
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_local.ps1
 ```
 
 浏览器打开 `http://127.0.0.1:3000`。关闭程序按 `Ctrl+C`。
 
-若没有配置密钥，页面和健康接口会明确提示“未就绪”，不会暗中改用虚构答案。自动化测试使用显式虚构模式，不消耗API费用。
+若缺少任一必要密钥，页面和健康接口会明确提示“未就绪”，不会暗中改用虚构答案。自动化测试使用显式虚构模式，不消耗API费用。切换到OpenAI或其他兼容接口的方法见 `services/api/README.md`。
 
 ## 开发检查
 
-```bash
-.venv/bin/python scripts/check_baselines.py
-.venv/bin/python -m pytest -q
-cd apps/web && npm run typecheck && npm run build
+```powershell
+.\.venv\Scripts\python scripts\check_baselines.py
+.\.venv\Scripts\python -m pytest -q
+Set-Location apps\web
+npm run typecheck
+npm run build
 ```
 
 ## P2.2边界

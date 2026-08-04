@@ -10,29 +10,30 @@ import httpx
 from pydantic import ValidationError
 
 from .identity_gate import evaluate_product_name
+from .model_provider import (
+    ChatCompletionsSettings,
+    OpenAICompatibleJSONModel,
+    StructuredModelProvider,
+)
 from .models import (
     Candidate,
     EvidenceSource,
     IdentityResearchResult,
     RelatedProduct,
 )
-
-
-class ProviderNotConfigured(RuntimeError):
-    pass
-
-
-class ProviderUnavailable(RuntimeError):
-    pass
-
-
-class ProviderInvalidResponse(RuntimeError):
-    pass
+from .provider_errors import ProviderInvalidResponse, ProviderNotConfigured, ProviderUnavailable
+from .search_provider import (
+    PublicSearchProvider,
+    SearchDocument,
+    TavilySearchProvider,
+)
 
 
 class IdentityResearchProvider(Protocol):
     mode: str
     model_name: str | None
+    model_provider_name: str
+    search_provider_name: str
 
     @property
     def ready(self) -> bool: ...
@@ -277,12 +278,25 @@ def _enforce_search_evidence(
         ]
         if isinstance(url, str) and url.startswith(("http://", "https://"))
     }
-    if visited:
-        result.sources = [source for source in result.sources if _normalize_url(source.url) in visited]
+    _apply_evidence_rules(result, visited if visited else None)
+
+
+def _apply_evidence_rules(
+    result: IdentityResearchResult,
+    allowed_urls: set[str] | None,
+) -> None:
+    if allowed_urls is not None:
+        result.sources = [
+            source for source in result.sources if _normalize_url(source.url) in allowed_urls
+        ]
         for candidate in result.candidates:
-            candidate.source_urls = [url for url in candidate.source_urls if _normalize_url(url) in visited]
+            candidate.source_urls = [
+                url for url in candidate.source_urls if _normalize_url(url) in allowed_urls
+            ]
         for related in result.related_products:
-            related.source_urls = [url for url in related.source_urls if _normalize_url(url) in visited]
+            related.source_urls = [
+                url for url in related.source_urls if _normalize_url(url) in allowed_urls
+            ]
 
     supported = {claim for source in result.sources for claim in source.supports}
     for related in result.related_products:
@@ -295,7 +309,13 @@ def _enforce_search_evidence(
         ):
             related.verification_status = "lead_only"
 
-    if result.outcome == "clear" and not {"identity", "operator", "legal_ai_scope"}.issubset(supported):
+    clear_fields_valid = bool(
+        result.canonical_product_name and result.operator_name and result.is_legal_ai is True
+    )
+    if result.outcome == "clear" and (
+        not clear_fields_valid
+        or not {"identity", "operator", "legal_ai_scope"}.issubset(supported)
+    ):
         attempted_name = result.canonical_product_name
         attempted_operator = result.operator_name
         attempted_type = result.product_type
@@ -323,6 +343,8 @@ def _enforce_search_evidence(
 
 class OpenAIResponsesIdentityProvider:
     mode = "openai_web_search"
+    model_provider_name = "openai"
+    search_provider_name = "openai_builtin"
 
     def __init__(
         self,
@@ -418,11 +440,170 @@ class OpenAIResponsesIdentityProvider:
         return _normalize_result(result)
 
 
+def _dedupe_documents(documents: list[SearchDocument], *, limit: int = 16) -> list[SearchDocument]:
+    kept: list[SearchDocument] = []
+    seen: set[str] = set()
+    for document in documents:
+        normalized = _normalize_url(document.url)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        kept.append(document)
+        if len(kept) >= limit:
+            break
+    return kept
+
+
+def _search_context(documents: list[SearchDocument]) -> str:
+    payload = [
+        {
+            "query": item.query,
+            "title": item.title,
+            "url": item.url,
+            "content_excerpt": item.content,
+        }
+        for item in documents
+    ]
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def _parse_external_result(output_text: str, documents: list[SearchDocument]) -> IdentityResearchResult:
+    try:
+        result = IdentityResearchResult.model_validate(json.loads(output_text))
+    except (json.JSONDecodeError, ValidationError) as exc:
+        raise ProviderInvalidResponse("模型返回结果不符合P2.2身份研究契约") from exc
+    result.web_search_used = True
+    allowed_urls = {_normalize_url(document.url) for document in documents}
+    _apply_evidence_rules(result, allowed_urls)
+    return _normalize_result(result)
+
+
+class ExternalSearchIdentityProvider:
+    """Provider-neutral identity workflow: public search first, JSON model second."""
+
+    def __init__(
+        self,
+        model: StructuredModelProvider,
+        search: PublicSearchProvider,
+    ) -> None:
+        self.model = model
+        self.search = search
+        self.model_name = model.model_name
+        self.model_provider_name = model.provider_name
+        self.search_provider_name = search.provider_name
+        self.mode = f"{model.provider_name}_external_search"
+
+    @property
+    def ready(self) -> bool:
+        return self.model.ready and self.search.ready
+
+    @property
+    def readiness_message(self) -> str:
+        missing = [
+            message
+            for ready, message in [
+                (self.model.ready, self.model.readiness_message),
+                (self.search.ready, self.search.readiness_message),
+            ]
+            if not ready
+        ]
+        if missing:
+            return "；".join(missing) + "；不会执行真实检索，也不会改用虚构结果。"
+        return (
+            f"{self.model.provider_name}模型与{self.search.provider_name}公开搜索已就绪；"
+            "每次识别会调用模型和搜索接口。"
+        )
+
+    def _search_many(self, queries: list[str]) -> list[SearchDocument]:
+        documents: list[SearchDocument] = []
+        for query in queries:
+            documents.extend(self.search.search(query, max_results=5))
+        return _dedupe_documents(documents)
+
+    def _model_result(
+        self,
+        *,
+        product_name: str,
+        confirmed_by_user: bool,
+        operator_hint: str | None,
+        documents: list[SearchDocument],
+        stage: str,
+        prior_result: IdentityResearchResult | None = None,
+    ) -> IdentityResearchResult:
+        schema_text = json.dumps(RESEARCH_JSON_SCHEMA, ensure_ascii=False)
+        prior_text = (
+            prior_result.model_dump_json(exclude={"web_search_used"}) if prior_result else "无"
+        )
+        stage_instruction = (
+            "本轮只完成身份、运营主体和法律AI范围核验。无论结果如何，related_products必须为空。"
+            if stage == "identity"
+            else "身份初步通过。本轮复核身份，并识别同一运营主体的AI产品、API、MCP及其他技术入口。"
+        )
+        user_prompt = f"""待辨析产品：{product_name}
+用户是否确认过候选：{'是' if confirmed_by_user else '否'}
+候选运营主体提示：{operator_hint or '无'}
+执行阶段：{stage}
+阶段要求：{stage_instruction}
+上一阶段结构化结果：{prior_text}
+
+以下是搜索服务实际返回的公开网页证据。只能引用其中出现的URL；摘要只是线索，必须降低与证据强度不匹配的结论：
+{_search_context(documents)}
+
+请输出一个JSON对象，必须完整符合以下JSON Schema，不要输出Markdown或额外说明：
+{schema_text}
+"""
+        output_text = self.model.generate_json(IDENTITY_SYSTEM_PROMPT, user_prompt)
+        return _parse_external_result(output_text, documents)
+
+    def research(
+        self,
+        product_name: str,
+        *,
+        confirmed_by_user: bool = False,
+        operator_hint: str | None = None,
+    ) -> IdentityResearchResult:
+        if not self.ready:
+            raise ProviderNotConfigured(self.readiness_message)
+        identity_documents = self._search_many(
+            [
+                f'"{product_name}" 法律 AI 官网 运营主体',
+                f'"{product_name}" 用户协议 隐私政策 公司',
+            ]
+        )
+        identity_result = self._model_result(
+            product_name=product_name,
+            confirmed_by_user=confirmed_by_user,
+            operator_hint=operator_hint,
+            documents=identity_documents,
+            stage="identity",
+        )
+        if identity_result.outcome != "clear":
+            return identity_result
+
+        ecosystem_documents = self._search_many(
+            [
+                f'"{identity_result.operator_name}" AI 产品 API 开放平台 官方',
+                f'"{identity_result.operator_name}" MCP 官方 文档',
+            ]
+        )
+        all_documents = _dedupe_documents(identity_documents + ecosystem_documents)
+        return self._model_result(
+            product_name=identity_result.canonical_product_name or product_name,
+            confirmed_by_user=confirmed_by_user,
+            operator_hint=identity_result.operator_name,
+            documents=all_documents,
+            stage="ecosystem",
+            prior_result=identity_result,
+        )
+
+
 class FixtureIdentityResearchProvider:
     """Explicit offline provider for automated tests; never selected as a silent fallback."""
 
     mode = "deterministic_fixture"
     model_name = None
+    model_provider_name = "fixture"
+    search_provider_name = "none"
     ready = True
     readiness_message = "显式测试模式：使用虚构确定性数据，不代表真实公开检索。"
 
@@ -489,9 +670,24 @@ class FixtureIdentityResearchProvider:
 
 
 def provider_from_env() -> IdentityResearchProvider:
-    mode = os.getenv("LEGAL_AGENT_IDENTITY_PROVIDER", "openai").strip().casefold()
+    mode = os.getenv("LEGAL_AGENT_IDENTITY_PROVIDER", "deepseek").strip().casefold()
     if mode == "fixture":
         return FixtureIdentityResearchProvider()
-    if mode != "openai":
-        raise ValueError("LEGAL_AGENT_IDENTITY_PROVIDER只能是openai或fixture")
-    return OpenAIResponsesIdentityProvider()
+    if mode == "openai":
+        return OpenAIResponsesIdentityProvider()
+    if mode == "deepseek":
+        model_settings = ChatCompletionsSettings.deepseek_from_env()
+    elif mode == "compatible":
+        model_settings = ChatCompletionsSettings.compatible_from_env()
+    else:
+        raise ValueError(
+            "LEGAL_AGENT_IDENTITY_PROVIDER只能是deepseek、compatible、openai或fixture"
+        )
+
+    search_mode = os.getenv("LEGAL_AGENT_SEARCH_PROVIDER", "tavily").strip().casefold()
+    if search_mode != "tavily":
+        raise ValueError("当前LEGAL_AGENT_SEARCH_PROVIDER只能是tavily")
+    return ExternalSearchIdentityProvider(
+        OpenAICompatibleJSONModel(model_settings),
+        TavilySearchProvider(),
+    )

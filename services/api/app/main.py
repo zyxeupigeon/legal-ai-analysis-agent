@@ -7,17 +7,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .identity_provider import (
     IdentityResearchProvider,
-    ProviderInvalidResponse,
-    ProviderNotConfigured,
-    ProviderUnavailable,
     provider_from_env,
 )
 from .models import ClarificationCreate, HealthResponse, Task, TaskCreate
+from .provider_errors import ProviderInvalidResponse, ProviderNotConfigured, ProviderUnavailable
 from .service import ClarificationError, TaskNotFound, TaskService
 from .store import InMemoryTaskStore
 
 
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.2.1"
 
 
 def create_app(
@@ -69,6 +67,8 @@ def create_app(
             classifier_mode=active_provider.mode,
             provider_ready=active_provider.ready,
             model_name=active_provider.model_name,
+            model_provider=active_provider.model_provider_name,
+            search_provider=active_provider.search_provider_name,
             message=active_provider.readiness_message,
         )
 
