@@ -170,6 +170,7 @@ class _SequenceModel:
 
 class _RecordedSearch:
     provider_name = "recorded_search"
+    search_tier = "test"
     ready = True
     readiness_message = "ready"
 

@@ -25,13 +25,14 @@ def test_health_declares_explicit_fixture_mode() -> None:
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "app_version": "0.2.1",
+        "app_version": "0.2.2",
         "storage_mode": "memory_only",
         "classifier_mode": "deterministic_fixture",
         "provider_ready": True,
         "model_name": None,
         "model_provider": "fixture",
         "search_provider": "none",
+        "search_tier": "none",
         "message": "显式测试模式：使用虚构确定性数据，不代表真实公开检索。",
     }
 

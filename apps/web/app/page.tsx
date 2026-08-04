@@ -33,6 +33,7 @@ type Health = {
   model_name: string | null;
   model_provider: string;
   search_provider: string;
+  search_tier: string;
   message: string;
 };
 
@@ -160,7 +161,7 @@ export default function Home() {
       <section className="hero">
         <div className="eyebrow">LEGAL AI PRODUCT INTELLIGENCE</div>
         <h1>先确认产品，<br />再开始分析。</h1>
-        <p className="hero-copy">单用户本地真实身份检索 · Agent核心 V1.1</p>
+        <p className="hero-copy">大陆可用测试版 P2.2.1 · Agent核心 V1.1</p>
         <div className="phase-strip" aria-label="当前实现进度">
           <span className="phase active">01 产品输入</span>
           <span className="phase active">02 身份闸门</span>
@@ -194,15 +195,16 @@ export default function Home() {
             </div>
           </form>
           <div className="test-note">
-            <strong>真实检索</strong>
+            <strong>{health?.search_tier === "test_only" ? "测试级真实检索" : "真实检索"}</strong>
             <span>模型与公开网页搜索可以分别替换</span>
             <span>当前：{health ? `${health.model_provider} + ${health.search_provider}` : "正在读取配置"}</span>
+            {health?.search_tier === "test_only" && <span>免搜索密钥，但不用于正式报告</span>}
           </div>
           {error && <p className="error" role="alert">{error}</p>}
         </section>
 
         <aside className="panel scope-panel">
-          <span className="label">P2.2 范围</span>
+          <span className="label">P2.2.1 范围</span>
           <h2>先核验，再给结论</h2>
           <ul>
             <li>名称不清楚，就停下询问</li>
@@ -318,7 +320,7 @@ export default function Home() {
           )}
 
           {currentTask.phase_limit_reached && (
-            <div className="phase-limit"><strong>P2.2 已到达阶段终点</strong><span>{currentTask.next_action}</span></div>
+            <div className="phase-limit"><strong>P2.2.1 已到达阶段终点</strong><span>{currentTask.next_action}</span></div>
           )}
           <p className="task-id">任务 ID · {currentTask.task_id}</p>
         </section>

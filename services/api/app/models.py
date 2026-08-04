@@ -160,4 +160,5 @@ class HealthResponse(BaseModel):
     model_name: str | None = None
     model_provider: str
     search_provider: str
+    search_tier: str
     message: str
