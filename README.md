@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-当前为 **P2.2.1：大陆可用测试版**。默认只要求DeepSeek API：DeepSeek负责结构化判断，免密钥测试搜索负责发现并直接读取公开网页。该搜索入口可能受网络或页面变化影响，因此只用于本地测试，不用于正式报告。Tavily、OpenAI原生检索和其他兼容模型仍为可选适配。
+当前为 **P2.2.2：大陆可用测试版修复轮**。默认只要求DeepSeek API：DeepSeek负责结构化判断，免密钥测试搜索负责发现并直接读取公开网页。中文产品名称采用精确全名、多组限定词回退和结果相关性过滤；该搜索入口仍可能受网络或页面变化影响，因此只用于本地测试，不用于正式报告。Tavily、OpenAI原生检索和其他兼容模型仍为可选适配。
 
 任务仍只保存在内存中，重启API后清空。本阶段不包含数据库、部署、多用户、正式报告生成或训练。
 
@@ -41,10 +41,11 @@ DEEPSEEK_API_KEY=你的DeepSeek API密钥
 `.env` 已被Git忽略，真实密钥不得发到聊天、提交到Git或写进前端代码。然后在PowerShell执行：
 
 ```powershell
+Unblock-File -LiteralPath .\scripts\run_local.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\run_local.ps1
 ```
 
-浏览器打开 `http://127.0.0.1:3000`。关闭程序按 `Ctrl+C`。
+浏览器打开 `http://localhost:3000`；`http://127.0.0.1:3000`也受本地开发配置支持。关闭程序按 `Ctrl+C`。启动脚本直接调用Node与Next.js入口，避免部分Windows安装路径下npm启动器误把`node.exe`当成脚本读取。
 
 若缺少DeepSeek密钥，页面和健康接口会明确提示“未就绪”。若测试搜索异常、没有结果或无法直接读取结果网页，任务会停止，不会暗中改用模型记忆或虚构答案。切换到Tavily、OpenAI或其他兼容接口的方法见 `services/api/README.md`。
 
@@ -58,7 +59,7 @@ npm run typecheck
 npm run build
 ```
 
-## P2.2.1边界
+## P2.2.2边界
 
 允许：本地页面、内存API、真实模型调用、公开网页身份核验、最小澄清和同企业AI生态线索识别。
 

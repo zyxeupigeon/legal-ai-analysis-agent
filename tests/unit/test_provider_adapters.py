@@ -104,34 +104,55 @@ def test_tavily_search_adapter_returns_only_http_documents() -> None:
     assert [item.url for item in documents] == ["https://official.example/product"]
 
 
-def test_bing_rss_test_search_reads_result_pages_and_removes_query_quotes() -> None:
+def test_bing_rss_test_search_preserves_exact_phrase_and_filters_unrelated_pages() -> None:
     captured_query = ""
-    html = "<html><head><title>产品官网</title></head><body>" + ("法律AI产品公开介绍。" * 30) + "</body></html>"
+    official_html = (
+        "<html><head><title>产品官网</title></head><body>"
+        + ("得理法搜是法律AI产品。" * 30)
+        + "</body></html>"
+    )
+    unrelated_html = (
+        "<html><head><title>公开的释义</title></head><body>"
+        + ("汉语字典与语文教学内容。" * 30)
+        + "</body></html>"
+    )
 
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal captured_query
         if request.url.path == "/search":
             captured_query = request.url.params["q"]
             rss = """<?xml version="1.0"?><rss><channel>
+              <item><title>公开怎么读</title><link>https://dictionary.example/public</link></item>
               <item><title>产品官网</title><link>https://official.example/product</link></item>
               <item><title>内网</title><link>http://127.0.0.1/private</link></item>
             </channel></rss>"""
             return httpx.Response(200, text=rss, headers={"content-type": "application/rss+xml"})
+        if request.url.host == "dictionary.example":
+            return httpx.Response(
+                200,
+                text=unrelated_html,
+                headers={"content-type": "text/html; charset=utf-8"},
+            )
         if request.url.host == "official.example":
-            return httpx.Response(200, text=html, headers={"content-type": "text/html; charset=utf-8"})
+            return httpx.Response(
+                200,
+                text=official_html,
+                headers={"content-type": "text/html; charset=utf-8"},
+            )
         return httpx.Response(404)
 
     provider = BingRssTestSearchProvider(
         BingRssTestSearchSettings(base_url="https://cn.bing.test"),
         transport=httpx.MockTransport(handler),
     )
-    documents = provider.search('"公开法务助手" 法律 AI')
+    documents = provider.search('"得理法搜" 法律 AI')
 
-    assert '"' not in captured_query
+    assert '"得理法搜"' in captured_query
     assert provider.search_tier == "test_only"
     assert [item.url for item in documents] == ["https://official.example/product"]
+    assert documents[0].score == 3.0
     assert documents[0].retrieval_status == "direct_page"
-    assert "法律AI产品公开介绍" in documents[0].content
+    assert "得理法搜是法律AI产品" in documents[0].content
 
 
 def test_bing_rss_test_search_fails_closed_when_pages_cannot_be_read() -> None:

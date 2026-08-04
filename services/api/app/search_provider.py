@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from html.parser import HTMLParser
 import ipaddress
 import os
+import re
 from time import monotonic
 from typing import Any, Protocol
-from urllib.parse import urljoin, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 import xml.etree.ElementTree as ET
 
 import httpx
@@ -272,9 +273,47 @@ class BingRssTestSearchProvider:
                 return final_url, extracted
         return None
 
+    @staticmethod
+    def _normalized_match_text(value: str) -> str:
+        return "".join(character for character in value.casefold() if character.isalnum())
+
+    @classmethod
+    def _quoted_targets(cls, query: str) -> list[str]:
+        return [
+            normalized
+            for phrase in re.findall(r'"([^"\r\n]{2,80})"', query)
+            if (normalized := cls._normalized_match_text(phrase))
+        ]
+
+    @classmethod
+    def _relevance_score(
+        cls,
+        *,
+        title: str,
+        url: str,
+        content: str,
+        quoted_targets: list[str],
+    ) -> float | None:
+        """Require an exact quoted anchor when present; reject broad token-only matches."""
+        if not quoted_targets:
+            return 1.0
+        normalized_title = cls._normalized_match_text(title)
+        normalized_url = cls._normalized_match_text(unquote(url))
+        normalized_content = cls._normalized_match_text(content)
+        score = 0.0
+        for target in quoted_targets:
+            if target in normalized_title:
+                score += 4.0
+            if target in normalized_content:
+                score += 3.0
+            if target in normalized_url:
+                score += 2.0
+        return score or None
+
     def search(self, query: str, *, max_results: int = 5) -> list[SearchDocument]:
         requested = max(1, min(max_results, 10))
-        rss_query = " ".join(query.replace('"', " ").split())
+        rss_query = " ".join(query.replace("\x00", " ").split())[:240]
+        quoted_targets = self._quoted_targets(rss_query)
         try:
             with httpx.Client(
                 base_url=self.settings.base_url,
@@ -283,13 +322,19 @@ class BingRssTestSearchProvider:
                 headers={
                     "User-Agent": (
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 LegalAIAnalysisAgentTest/0.2.2"
+                        "AppleWebKit/537.36 LegalAIAnalysisAgentTest/0.2.3"
                     )
                 },
             ) as client:
                 response = client.get(
                     "/search",
-                    params={"q": rss_query, "format": "rss", "setlang": "zh-hans"},
+                    params={
+                        "q": rss_query,
+                        "format": "rss",
+                        "setlang": "zh-hans",
+                        "mkt": "zh-CN",
+                        "cc": "cn",
+                    },
                 )
                 response.raise_for_status()
                 if len(response.content) > 2_000_000:
@@ -315,12 +360,21 @@ class BingRssTestSearchProvider:
                     if not fetched:
                         continue
                     final_url, content = fetched
+                    score = self._relevance_score(
+                        title=title,
+                        url=final_url,
+                        content=content,
+                        quoted_targets=quoted_targets,
+                    )
+                    if score is None:
+                        continue
                     documents.append(
                         SearchDocument(
                             query=query,
                             title=(title or final_url)[:300],
                             url=final_url,
                             content=content,
+                            score=score,
                             retrieval_status="direct_page",
                         )
                     )
@@ -339,6 +393,7 @@ class BingRssTestSearchProvider:
 
         if not documents:
             raise ProviderUnavailable(
-                "测试搜索没有取得可直接读取的公开网页，已停止任务；不会使用模型记忆补造证据"
+                "测试搜索没有取得与精确名称相关且可直接读取的公开网页，"
+                "已停止当前查询；不会使用模型记忆补造证据"
             )
-        return documents
+        return sorted(documents, key=lambda item: item.score or 0.0, reverse=True)

@@ -15,7 +15,7 @@ from .service import ClarificationError, TaskNotFound, TaskService
 from .store import InMemoryTaskStore
 
 
-APP_VERSION = "0.2.2"
+APP_VERSION = "0.2.3"
 
 
 def create_app(
@@ -29,7 +29,7 @@ def create_app(
     application = FastAPI(
         title="法律AI分析Agent API",
         version=APP_VERSION,
-        description="P2.2.1大陆可用测试版身份闸门与公开信息检索；不建库、不生成报告、不训练。",
+        description="P2.2.2大陆可用测试版身份闸门与公开信息检索；不建库、不生成报告、不训练。",
     )
     application.state.task_store = active_store
     application.state.identity_provider = active_provider
