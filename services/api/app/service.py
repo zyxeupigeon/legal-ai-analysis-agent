@@ -115,7 +115,7 @@ class TaskService:
         task.candidates = []
         task.clarification_question = None
         task.status_message = "身份、运营主体与法律AI边界已完成公开核验；相关AI产品/API/MCP线索已识别。"
-        task.next_action = "P2.2.1在正式报告生成前暂停。"
+        task.next_action = "P2.2.2在正式报告生成前暂停。"
         task.phase_limit_reached = True
         transition(task, TaskStatus.RESEARCHING, reason)
 

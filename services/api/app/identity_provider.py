@@ -190,7 +190,7 @@ RESEARCH_JSON_SCHEMA: dict[str, Any] = {
 }
 
 
-IDENTITY_SYSTEM_PROMPT = """你是法律AI产品身份研究Agent，只执行P2.2.1身份辨析与同企业AI生态线索识别。
+IDENTITY_SYSTEM_PROMPT = """你是法律AI产品身份研究Agent，只执行P2.2.2身份辨析与同企业AI生态线索识别。
 
 必须遵守：
 1. 只使用公开网页检索所得信息；优先级为政府/监管、产品官网与官方文档、官方条款和运营主体官网，再到可靠行业与媒体来源。
@@ -437,7 +437,7 @@ class OpenAIResponsesIdentityProvider:
         try:
             result = IdentityResearchResult.model_validate(json.loads(output_text))
         except (json.JSONDecodeError, ValidationError) as exc:
-            raise ProviderInvalidResponse("Agent返回结果不符合P2.2.1身份研究契约") from exc
+            raise ProviderInvalidResponse("Agent返回结果不符合P2.2.2身份研究契约") from exc
         result.web_search_used = web_search_used
         _merge_citation_annotations(result, annotations)
         _enforce_search_evidence(result, annotations, search_sources)
@@ -476,7 +476,7 @@ def _parse_external_result(output_text: str, documents: list[SearchDocument]) ->
     try:
         result = IdentityResearchResult.model_validate(json.loads(output_text))
     except (json.JSONDecodeError, ValidationError) as exc:
-        raise ProviderInvalidResponse("模型返回结果不符合P2.2.1身份研究契约") from exc
+        raise ProviderInvalidResponse("模型返回结果不符合P2.2.2身份研究契约") from exc
     result.web_search_used = True
     allowed_urls = {_normalize_url(document.url) for document in documents}
     _apply_evidence_rules(result, allowed_urls)
@@ -522,9 +522,19 @@ class ExternalSearchIdentityProvider:
 
     def _search_many(self, queries: list[str]) -> list[SearchDocument]:
         documents: list[SearchDocument] = []
+        failures: list[str] = []
         for query in queries:
-            documents.extend(self.search.search(query, max_results=5))
-        return _dedupe_documents(documents)
+            try:
+                documents.extend(self.search.search(query, max_results=5))
+            except ProviderUnavailable as exc:
+                failures.append(str(exc))
+        deduplicated = _dedupe_documents(documents)
+        if not deduplicated:
+            detail = failures[-1] if failures else "没有取得相关公开网页"
+            raise ProviderUnavailable(
+                f"多组测试查询均未取得可用证据：{detail}；任务已停止，不会使用模型记忆补造证据"
+            )
+        return deduplicated
 
     def _model_result(
         self,
@@ -572,8 +582,10 @@ class ExternalSearchIdentityProvider:
             raise ProviderNotConfigured(self.readiness_message)
         identity_documents = self._search_many(
             [
-                f'"{product_name}" 法律 AI 官网 运营主体',
-                f'"{product_name}" 用户协议 隐私政策 公司',
+                f'"{product_name}"',
+                f'"{product_name}" 法律 AI 产品',
+                f'"{product_name}" 官网 运营主体 公司',
+                f'"{product_name}" 用户协议 隐私政策 开发者',
             ]
         )
         identity_result = self._model_result(

@@ -10,6 +10,7 @@ from services.api.app.identity_provider import (
     ProviderNotConfigured,
     RESEARCH_JSON_SCHEMA,
 )
+from services.api.app.provider_errors import ProviderUnavailable
 from services.api.app.search_provider import SearchDocument
 
 
@@ -198,6 +199,21 @@ class _RecordedSearch:
         ]
 
 
+class _FallbackSearch(_RecordedSearch):
+    def search(self, query: str, *, max_results: int = 5) -> list[SearchDocument]:
+        self.queries.append(query)
+        if len(self.queries) < 3:
+            raise ProviderUnavailable("当前查询没有相关结果")
+        return [
+            SearchDocument(
+                query=query,
+                title="产品官网",
+                url="https://official.example/product",
+                content="公开法务助手由公开法科公司运营，是法律AI产品。",
+            )
+        ]
+
+
 def test_external_search_runs_ecosystem_only_after_clear_identity() -> None:
     identity = _clear_result()
     identity["related_products"] = []
@@ -241,7 +257,7 @@ def test_external_search_runs_ecosystem_only_after_clear_identity() -> None:
 
     result = provider.research("公开法务助手")
 
-    assert len(search.queries) == 4
+    assert len(search.queries) == 6
     assert len(model.prompts) == 2
     assert result.outcome == "clear"
     assert result.web_search_used is True
@@ -274,6 +290,32 @@ def test_external_search_stops_before_ecosystem_when_identity_is_ambiguous() -> 
     result = ExternalSearchIdentityProvider(model, search).research("公开助手")
 
     assert result.outcome == "ambiguous"
-    assert len(search.queries) == 2
+    assert len(search.queries) == 4
     assert len(model.prompts) == 1
     assert result.related_products == []
+
+
+def test_external_search_continues_query_plan_after_irrelevant_results() -> None:
+    ambiguous = _clear_result()
+    ambiguous.update(
+        {
+            "outcome": "ambiguous",
+            "canonical_product_name": None,
+            "operator_name": None,
+            "product_type": None,
+            "is_legal_ai": None,
+            "clarification_question": "请确认具体产品。",
+            "candidates": [],
+            "related_products": [],
+        }
+    )
+    model = _SequenceModel([ambiguous])
+    search = _FallbackSearch()
+
+    result = ExternalSearchIdentityProvider(model, search).research("公开法务助手")
+
+    assert result.outcome == "ambiguous"
+    assert len(search.queries) == 4
+    assert search.queries[0] == '"公开法务助手"'
+    assert '"公开法务助手" 法律 AI 产品' in search.queries
+    assert len(model.prompts) == 1
