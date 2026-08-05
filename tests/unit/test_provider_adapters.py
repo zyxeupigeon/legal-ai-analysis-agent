@@ -176,6 +176,62 @@ def test_bing_rss_test_search_fails_closed_when_pages_cannot_be_read() -> None:
         provider.search("公开法务助手")
 
 
+def test_bing_rss_test_search_skips_one_page_connection_failure() -> None:
+    official_html = "<html><body>" + ("得理法搜是法律AI产品。" * 30) + "</body></html>"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/search":
+            return httpx.Response(
+                200,
+                text=(
+                    "<?xml version='1.0'?><rss><channel>"
+                    "<item><title>失效候选</title><link>https://dead.example/product</link></item>"
+                    "<item><title>得理法搜官网</title>"
+                    "<link>https://official.example/product</link></item>"
+                    "</channel></rss>"
+                ),
+            )
+        if request.url.host == "dead.example":
+            raise httpx.ConnectError("candidate page is unreachable", request=request)
+        if request.url.host == "official.example":
+            return httpx.Response(
+                200,
+                text=official_html,
+                headers={"content-type": "text/html; charset=utf-8"},
+            )
+        return httpx.Response(404)
+
+    provider = BingRssTestSearchProvider(
+        BingRssTestSearchSettings(base_url="https://cn.bing.test"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    documents = provider.search('"得理法搜" 法律 AI')
+
+    assert [item.url for item in documents] == ["https://official.example/product"]
+
+
+def test_bing_rss_test_search_distinguishes_unreadable_pages_from_search_outage() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/search":
+            return httpx.Response(
+                200,
+                text=(
+                    "<?xml version='1.0'?><rss><channel><item><title>候选</title>"
+                    "<link>https://dead.example/product</link></item></channel></rss>"
+                ),
+            )
+        raise httpx.ConnectError("candidate page is unreachable", request=request)
+
+    provider = BingRssTestSearchProvider(
+        BingRssTestSearchSettings(base_url="https://cn.bing.test"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(ProviderUnavailable, match="搜索入口连接正常.*候选结果网页均无法直接读取"):
+        provider.search('"得理法搜" 法律 AI')
+
+
 def test_deepseek_default_requires_no_search_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LEGAL_AGENT_IDENTITY_PROVIDER", "deepseek")
     monkeypatch.delenv("LEGAL_AGENT_SEARCH_PROVIDER", raising=False)
