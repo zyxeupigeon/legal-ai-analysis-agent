@@ -8,13 +8,13 @@ $NextCli = Join-Path $NodeModules "next\dist\bin\next"
 $EnvFile = Join-Path $RepoRoot ".env"
 
 if (-not (Test-Path $Uvicorn)) {
-    Write-Error "尚未安装本地API依赖。请先按README执行一次安装命令。"
+    Write-Error "Local API dependencies are missing. Follow the one-time setup in README.md."
 }
 if (-not (Test-Path $NodeModules)) {
-    Write-Error "尚未安装页面依赖。请先按README执行一次npm install。"
+    Write-Error "Web dependencies are missing. Run npm install in apps\web."
 }
 if (-not (Test-Path $NextCli)) {
-    Write-Error "未找到Next.js启动文件。请在apps\web重新执行npm install。"
+    Write-Error "Next.js launcher is missing. Run npm install again in apps\web."
 }
 
 $NodeCommand = Get-Command node -ErrorAction Stop
