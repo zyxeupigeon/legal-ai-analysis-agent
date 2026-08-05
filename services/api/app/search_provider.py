@@ -187,6 +187,7 @@ def _is_public_web_url(url: str) -> bool:
 @dataclass(frozen=True)
 class BingRssTestSearchSettings:
     base_url: str = "https://cn.bing.com"
+    app_catalog_url: str = "https://itunes.apple.com/search"
     timeout_seconds: float = 20.0
     max_page_bytes: int = 524_288
 
@@ -194,6 +195,9 @@ class BingRssTestSearchSettings:
     def from_env(cls) -> "BingRssTestSearchSettings":
         return cls(
             base_url=os.getenv("TEST_SEARCH_BASE_URL", "https://cn.bing.com").rstrip("/"),
+            app_catalog_url=os.getenv(
+                "TEST_APP_CATALOG_URL", "https://itunes.apple.com/search"
+            ).strip(),
             timeout_seconds=min(
                 30.0,
                 max(5.0, float(os.getenv("TOOL_TIMEOUT_SECONDS", "20") or "20")),
@@ -206,9 +210,9 @@ class BingRssTestSearchSettings:
 
 
 class BingRssTestSearchProvider:
-    """Keyless, fail-closed search for local testing; not a production search API."""
+    """Keyless, fail-closed test search with an official app-catalog fallback."""
 
-    provider_name = "bing_rss_test"
+    provider_name = "keyless_test_search"
     search_tier = "test_only"
 
     def __init__(
@@ -227,7 +231,8 @@ class BingRssTestSearchProvider:
     @property
     def readiness_message(self) -> str:
         return (
-            "测试级免密钥搜索已启用；依赖Bing中国公开RSS和网页直读，"
+            "测试级免密钥搜索已启用；使用Bing中国公开RSS、网页直读和"
+            "Apple官方应用目录回退，"
             "可能受页面变化或网络限制影响，不得用于正式报告。"
         )
 
@@ -285,6 +290,83 @@ class BingRssTestSearchProvider:
             if (normalized := cls._normalized_match_text(phrase))
         ]
 
+    @staticmethod
+    def _quoted_phrases(query: str) -> list[str]:
+        return [phrase.strip() for phrase in re.findall(r'"([^"\r\n]{2,80})"', query)]
+
+    def _search_official_app_catalog(
+        self,
+        query: str,
+        *,
+        max_results: int,
+    ) -> list[SearchDocument]:
+        phrases = self._quoted_phrases(query)
+        if not phrases or not _is_public_web_url(self.settings.app_catalog_url):
+            return []
+        target = phrases[0]
+        normalized_target = self._normalized_match_text(target)
+        with httpx.Client(
+            timeout=self.settings.timeout_seconds,
+            transport=self._transport,
+            headers={"User-Agent": "LegalAIAnalysisAgentTest/0.2.3"},
+        ) as client:
+            response = client.get(
+                self.settings.app_catalog_url,
+                params={
+                    "term": target,
+                    "country": "cn",
+                    "media": "software",
+                    "entity": "software",
+                    "limit": min(20, max(5, max_results * 2)),
+                },
+            )
+            response.raise_for_status()
+            if len(response.content) > 2_000_000:
+                raise ProviderUnavailable("Apple官方应用目录返回内容异常过大")
+            payload = response.json()
+
+        results = payload.get("results")
+        if not isinstance(results, list):
+            raise ProviderUnavailable("Apple官方应用目录返回格式已变化")
+
+        exact_name_matches: list[SearchDocument] = []
+        supporting_matches: list[SearchDocument] = []
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+            track_name = str(item.get("trackName") or "").strip()
+            seller_name = str(item.get("sellerName") or "").strip()
+            description = str(item.get("description") or "").strip()
+            track_url = str(item.get("trackViewUrl") or "").strip()
+            if not track_name or not _is_public_web_url(track_url):
+                continue
+            content = "\n".join(
+                part
+                for part in (
+                    f"应用名称：{track_name}",
+                    f"开发者：{seller_name}" if seller_name else "",
+                    f"应用说明：{description}" if description else "",
+                )
+                if part
+            )[:3000]
+            document = SearchDocument(
+                query=query,
+                title=f"Apple App Store：{track_name}"[:300],
+                url=track_url,
+                content=content,
+                score=8.0,
+                retrieval_status="official_app_catalog",
+            )
+            if self._normalized_match_text(track_name) == normalized_target:
+                exact_name_matches.append(document)
+            elif normalized_target in self._normalized_match_text(
+                f"{seller_name} {description}"
+            ):
+                supporting_matches.append(document)
+
+        selected = exact_name_matches or supporting_matches
+        return selected[:max_results]
+
     @classmethod
     def _relevance_score(
         cls,
@@ -314,6 +396,10 @@ class BingRssTestSearchProvider:
         requested = max(1, min(max_results, 10))
         rss_query = " ".join(query.replace("\x00", " ").split())[:240]
         quoted_targets = self._quoted_targets(rss_query)
+        documents: list[SearchDocument] = []
+        attempted_pages = 0
+        unreadable_pages = 0
+        bing_failure: str | None = None
         try:
             with httpx.Client(
                 base_url=self.settings.base_url,
@@ -344,10 +430,7 @@ class BingRssTestSearchProvider:
                 except ET.ParseError as exc:
                     raise ProviderUnavailable("测试搜索返回格式已变化，已停止本次任务") from exc
 
-                documents: list[SearchDocument] = []
                 seen: set[str] = set()
-                attempted_pages = 0
-                unreadable_pages = 0
                 started_at = monotonic()
                 candidate_limit = max(6, requested * 2)
                 for index, item in enumerate(root.findall(".//item")):
@@ -391,25 +474,48 @@ class BingRssTestSearchProvider:
                     )
                     if len(documents) >= requested:
                         break
-        except ProviderUnavailable:
-            raise
-        except httpx.TimeoutException as exc:
-            raise ProviderUnavailable("测试级公开搜索超时，已停止本次任务") from exc
+        except ProviderUnavailable as exc:
+            bing_failure = str(exc)
+        except httpx.TimeoutException:
+            bing_failure = "Bing测试搜索超时"
         except httpx.HTTPStatusError as exc:
-            raise ProviderUnavailable(
-                f"测试级公开搜索失败（HTTP {exc.response.status_code}），已停止本次任务"
-            ) from exc
-        except httpx.RequestError as exc:
-            raise ProviderUnavailable("无法连接测试级公开搜索，已停止本次任务") from exc
+            bing_failure = f"Bing测试搜索失败（HTTP {exc.response.status_code}）"
+        except httpx.RequestError:
+            bing_failure = "无法连接Bing测试搜索"
 
-        if not documents:
-            if attempted_pages and unreadable_pages == attempted_pages:
-                raise ProviderUnavailable(
-                    "测试搜索入口连接正常，但候选结果网页均无法直接读取，"
-                    "已停止当前查询；不会使用模型记忆补造证据"
-                )
+        if documents:
+            return sorted(documents, key=lambda item: item.score or 0.0, reverse=True)
+
+        app_catalog_failure: str | None = None
+        try:
+            app_documents = self._search_official_app_catalog(query, max_results=requested)
+        except ProviderUnavailable as exc:
+            app_catalog_failure = str(exc)
+            app_documents = []
+        except httpx.TimeoutException:
+            app_catalog_failure = "Apple官方应用目录超时"
+            app_documents = []
+        except httpx.HTTPStatusError as exc:
+            app_catalog_failure = f"Apple官方应用目录失败（HTTP {exc.response.status_code}）"
+            app_documents = []
+        except (httpx.RequestError, ValueError):
+            app_catalog_failure = "无法连接或解析Apple官方应用目录"
+            app_documents = []
+
+        if app_documents:
+            return app_documents
+
+        if bing_failure and app_catalog_failure:
             raise ProviderUnavailable(
-                "测试搜索没有取得与精确名称相关且可直接读取的公开网页，"
+                f"免费测试搜索来源均不可用：{bing_failure}；{app_catalog_failure}；"
                 "已停止当前查询；不会使用模型记忆补造证据"
             )
-        return sorted(documents, key=lambda item: item.score or 0.0, reverse=True)
+        if attempted_pages and unreadable_pages == attempted_pages:
+            raise ProviderUnavailable(
+                "Bing搜索入口正常但候选网页均无法直接读取，Apple官方应用目录也未找到"
+                "精确名称记录；已停止当前查询；不会使用模型记忆补造证据"
+            )
+        raise ProviderUnavailable(
+            "Bing网页检索和Apple官方应用目录均未取得与精确名称相关的公开证据，"
+            "已停止当前查询；不会使用模型记忆补造证据"
+        )
