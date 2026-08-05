@@ -346,6 +346,8 @@ class BingRssTestSearchProvider:
 
                 documents: list[SearchDocument] = []
                 seen: set[str] = set()
+                attempted_pages = 0
+                unreadable_pages = 0
                 started_at = monotonic()
                 candidate_limit = max(6, requested * 2)
                 for index, item in enumerate(root.findall(".//item")):
@@ -356,8 +358,17 @@ class BingRssTestSearchProvider:
                     if not result_url or result_url in seen or not _is_public_web_url(result_url):
                         continue
                     seen.add(result_url)
-                    fetched = self._fetch_direct_page(client, result_url)
+                    attempted_pages += 1
+                    try:
+                        fetched = self._fetch_direct_page(client, result_url)
+                    except httpx.HTTPError:
+                        # Search results commonly mix sites with incompatible TLS,
+                        # dead links, or connection blocks. One such page must not
+                        # make a healthy RSS search look unavailable.
+                        unreadable_pages += 1
+                        continue
                     if not fetched:
+                        unreadable_pages += 1
                         continue
                     final_url, content = fetched
                     score = self._relevance_score(
@@ -392,6 +403,11 @@ class BingRssTestSearchProvider:
             raise ProviderUnavailable("无法连接测试级公开搜索，已停止本次任务") from exc
 
         if not documents:
+            if attempted_pages and unreadable_pages == attempted_pages:
+                raise ProviderUnavailable(
+                    "测试搜索入口连接正常，但候选结果网页均无法直接读取，"
+                    "已停止当前查询；不会使用模型记忆补造证据"
+                )
             raise ProviderUnavailable(
                 "测试搜索没有取得与精确名称相关且可直接读取的公开网页，"
                 "已停止当前查询；不会使用模型记忆补造证据"
