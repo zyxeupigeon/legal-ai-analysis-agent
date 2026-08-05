@@ -228,8 +228,58 @@ def test_bing_rss_test_search_distinguishes_unreadable_pages_from_search_outage(
         transport=httpx.MockTransport(handler),
     )
 
-    with pytest.raises(ProviderUnavailable, match="搜索入口连接正常.*候选结果网页均无法直接读取"):
+    with pytest.raises(ProviderUnavailable, match="Bing搜索入口正常.*候选网页均无法直接读取"):
         provider.search('"得理法搜" 法律 AI')
+
+
+def test_keyless_search_falls_back_to_exact_official_app_catalog_record() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "cn.bing.test" and request.url.path == "/search":
+            return httpx.Response(200, text="<?xml version='1.0'?><rss><channel /></rss>")
+        if request.url.host == "itunes.apple.test":
+            assert request.url.params["term"] == "得理法搜"
+            return httpx.Response(
+                200,
+                json={
+                    "resultCount": 3,
+                    "results": [
+                        {
+                            "trackName": "得理法搜",
+                            "sellerName": "Shenzhen Deli Technology Co., Ltd.",
+                            "trackViewUrl": "https://apps.apple.com/cn/app/id1512357117",
+                            "description": "得理法搜是深圳得理科技有限公司推出的法律AI产品。",
+                        },
+                        {
+                            "trackName": "得理律助",
+                            "sellerName": "Shenzhen Deli Technology Co., Ltd.",
+                            "trackViewUrl": "https://apps.apple.com/cn/app/id-other",
+                            "description": "律师办公应用。",
+                        },
+                        {
+                            "trackName": "无关法律应用",
+                            "sellerName": "Other Developer",
+                            "trackViewUrl": "https://apps.apple.com/cn/app/id-unrelated",
+                            "description": "无关内容。",
+                        },
+                    ],
+                },
+            )
+        return httpx.Response(404)
+
+    provider = BingRssTestSearchProvider(
+        BingRssTestSearchSettings(
+            base_url="https://cn.bing.test",
+            app_catalog_url="https://itunes.apple.test/search",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+
+    documents = provider.search('"得理法搜" 法律 AI')
+
+    assert [item.title for item in documents] == ["Apple App Store：得理法搜"]
+    assert documents[0].retrieval_status == "official_app_catalog"
+    assert "Shenzhen Deli Technology Co., Ltd." in documents[0].content
+    assert "得理律助" not in documents[0].content
 
 
 def test_deepseek_default_requires_no_search_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -243,6 +293,16 @@ def test_deepseek_default_requires_no_search_api_key(monkeypatch: pytest.MonkeyP
     assert isinstance(provider, ExternalSearchIdentityProvider)
     assert provider.ready is True
     assert provider.model_provider_name == "deepseek"
-    assert provider.search_provider_name == "bing_rss_test"
+    assert provider.search_provider_name == "keyless_test_search"
     assert provider.search_tier == "test_only"
     assert "测试级" in provider.readiness_message
+
+
+def test_legacy_bing_search_setting_enables_keyless_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LEGAL_AGENT_IDENTITY_PROVIDER", "deepseek")
+    monkeypatch.setenv("LEGAL_AGENT_SEARCH_PROVIDER", "bing_rss_test")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "deepseek-test-key")
+
+    provider = provider_from_env()
+
+    assert provider.search_provider_name == "keyless_test_search"
