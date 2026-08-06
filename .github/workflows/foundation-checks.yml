@@ -1,4 +1,4 @@
-name: P2.3.1 Checks
+name: Repository Checks
 
 on:
   pull_request:
@@ -24,7 +24,12 @@ jobs:
           for path in README.md PROJECT_STRUCTURE.md VERSION_MANIFEST.yaml CHANGELOG.md .gitignore .env.example CONTRIBUTING.md SECURITY.md NOTICE.md; do
             test -f "$path" || { echo "Missing $path"; exit 1; }
           done
-          grep -Fq 'project_phase: "P2.3.1"' VERSION_MANIFEST.yaml
+          project_phase="$(sed -n 's/^project_phase: "\([^"]*\)"$/\1/p' VERSION_MANIFEST.yaml)"
+          test -n "$project_phase" || { echo 'Missing project_phase in VERSION_MANIFEST.yaml'; exit 1; }
+          [[ "$project_phase" =~ ^P[0-9]+(\.[0-9]+)+$ ]] || {
+            echo "Invalid project_phase format: $project_phase"
+            exit 1
+          }
           grep -Fq 'repository_visibility: "private"' VERSION_MANIFEST.yaml
           grep -Fq 'agent_core: "1.1"' VERSION_MANIFEST.yaml
           grep -Fq 'business_code_allowed: true' VERSION_MANIFEST.yaml
