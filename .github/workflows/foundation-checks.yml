@@ -1,4 +1,4 @@
-name: P2.2.2 Checks
+name: P2.3.1 Checks
 
 on:
   pull_request:
@@ -24,7 +24,7 @@ jobs:
           for path in README.md PROJECT_STRUCTURE.md VERSION_MANIFEST.yaml CHANGELOG.md .gitignore .env.example CONTRIBUTING.md SECURITY.md NOTICE.md; do
             test -f "$path" || { echo "Missing $path"; exit 1; }
           done
-          grep -Fq 'project_phase: "P2.2.2"' VERSION_MANIFEST.yaml
+          grep -Fq 'project_phase: "P2.3.1"' VERSION_MANIFEST.yaml
           grep -Fq 'repository_visibility: "private"' VERSION_MANIFEST.yaml
           grep -Fq 'agent_core: "1.1"' VERSION_MANIFEST.yaml
           grep -Fq 'business_code_allowed: true' VERSION_MANIFEST.yaml
@@ -32,7 +32,8 @@ jobs:
           grep -Fq 'database_allowed: false' VERSION_MANIFEST.yaml
           grep -Fq 'real_model_calls_allowed: true' VERSION_MANIFEST.yaml
           grep -Fq 'public_web_research_allowed: true' VERSION_MANIFEST.yaml
-          grep -Fq 'report_generation_allowed: false' VERSION_MANIFEST.yaml
+          grep -Fq 'local_test_report_generation_allowed: true' VERSION_MANIFEST.yaml
+          grep -Fq 'formal_report_publication_allowed: false' VERSION_MANIFEST.yaml
           grep -Fq 'training_allowed: false' VERSION_MANIFEST.yaml
           grep -Fq 'openai_store_responses: false' VERSION_MANIFEST.yaml
 
