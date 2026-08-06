@@ -3,10 +3,8 @@ from __future__ import annotations
 import json
 from typing import Protocol
 
-from pydantic import ValidationError
-
 from .identity_provider import ExternalSearchIdentityProvider, FixtureIdentityResearchProvider
-from .model_provider import StructuredModelProvider
+from .model_provider import StructuredModelProvider, generate_validated_json
 from .models import (
     ReportDraft,
     ReportInsightDraft,
@@ -176,11 +174,13 @@ class EvidenceBoundReportDraftProvider:
 输出JSON必须符合以下Schema；sources字段可以留空，系统会根据实际引用自动回填：
 {schema}
 """
-        output = self.model.generate_json(REPORT_SYSTEM_PROMPT, prompt)
-        try:
-            draft = ReportDraft.model_validate(json.loads(output))
-        except (json.JSONDecodeError, ValidationError) as exc:
-            raise ProviderInvalidResponse("模型返回内容不符合P2.3.1报告草稿契约") from exc
+        draft = generate_validated_json(
+            self.model,
+            REPORT_SYSTEM_PROMPT,
+            prompt,
+            ReportDraft,
+            contract_name="模型返回内容不符合P2.3.1报告草稿契约",
+        )
         product = task.canonical_product_name or task.submitted_product_name
         draft.report_title = f"{product}标杆分析报告"
         draft.report_subtitle = "法律科技赛道 · P2.3.1本地测试稿"
