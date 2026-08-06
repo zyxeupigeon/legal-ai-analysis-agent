@@ -23,6 +23,33 @@ LIGHT_FILL = "F2F4F7"
 TABLE_WIDTH_DXA = 9360
 TABLE_INDENT_DXA = 120
 
+SOURCE_LEVEL_LABELS = {
+    "government_record": "政府或监管公开记录",
+    "official_primary": "官方原始资料",
+    "independent_secondary": "第三方公开资料",
+    "other_public": "其他公开资料",
+    "test_fixture": "虚构测试资料",
+}
+RELATED_STATUS_LABELS = {
+    "confirmed": "已由公开来源确认",
+    "lead_only": "仅发现公开线索",
+    "not_publicly_verified": "未获公开证据确认",
+}
+RELATED_KIND_LABELS = {
+    "product": "产品",
+    "api": "API",
+    "mcp": "MCP",
+    "model_platform": "模型平台",
+    "developer_platform": "开发者平台",
+    "database": "数据库",
+    "knowledge_base": "知识库",
+    "agent": "Agent",
+    "plugin": "插件",
+    "connector": "连接器",
+    "skill": "Skill",
+    "other": "其他",
+}
+
 
 def _set_run_font(run, *, size: float, bold: bool = False, color=BODY) -> None:
     run.font.name = "Arial"
@@ -136,7 +163,17 @@ def _safe_file_component(value: str) -> str:
 
 def report_file_name(task: Task, generated_on: date) -> str:
     product = _safe_file_component(task.canonical_product_name or task.submitted_product_name)
-    return f"{product}标杆分析报告_法律科技赛道.V0.1.P2.3.1测试稿.{generated_on:%Y%m%d}.docx"
+    return f"{product}标杆分析报告_法律科技赛道.V0.2.P2.3.2测试稿.{generated_on:%Y%m%d}.docx"
+
+
+def _source_reference_text(urls: list[str], source_numbers: dict[str, int]) -> str:
+    refs: list[int] = []
+    for url in urls:
+        normalized = url.split("#", 1)[0].rstrip("/")
+        number = source_numbers.get(normalized)
+        if number is not None and number not in refs:
+            refs.append(number)
+    return "、".join(f"[{number}]" for number in refs)
 
 
 def build_report_docx(
@@ -162,7 +199,7 @@ def build_report_docx(
 
     header = section.header.paragraphs[0]
     header.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    run = header.add_run("法律 AI 产品标杆分析 | P2.3.1 本地测试稿")
+    run = header.add_run("法律 AI 产品标杆分析 | P2.3.2 证据质量测试稿")
     _set_run_font(run, size=9, color=MUTED)
     _add_page_number(section.footer.paragraphs[0])
 
@@ -202,11 +239,28 @@ def build_report_docx(
     for paragraph in draft.executive_summary:
         document.add_paragraph(paragraph)
 
+    source_numbers = {
+        source.url.split("#", 1)[0].rstrip("/"): index
+        for index, source in enumerate(draft.sources, start=1)
+    }
+
+    summary_references = _source_reference_text(draft.executive_summary_source_urls, source_numbers)
+    if summary_references:
+        source_p = document.add_paragraph()
+        run = source_p.add_run(f"摘要证据：{summary_references}")
+        _set_run_font(run, size=8.5, color=MUTED)
+
+    scope_note = document.add_paragraph()
+    scope_run = scope_note.add_run(
+        "证据口径：政府或监管记录用于核验公开登记事实；企业官网、官方文档和应用说明仅证明其公开披露；分析判断不等同于已核实事实。"
+    )
+    _set_run_font(scope_run, size=8.5, color=MUTED)
+
     if task.related_products:
         document.add_heading("产品生态速览", level=2)
-        table = document.add_table(rows=1, cols=3)
+        table = document.add_table(rows=1, cols=4)
         table.style = "Table Grid"
-        headers = ["产品或入口", "类型与状态", "与核心产品的关系"]
+        headers = ["产品或入口", "类型", "核验状态", "与核心产品的关系及证据"]
         for cell, text in zip(table.rows[0].cells, headers, strict=True):
             _shade_cell(cell, LIGHT_FILL)
             p = cell.paragraphs[0]
@@ -216,17 +270,25 @@ def build_report_docx(
         _set_repeat_table_header(table.rows[0])
         for item in task.related_products:
             cells = table.add_row().cells
+            references = _source_reference_text(item.source_urls, source_numbers)
+            effective_status = item.verification_status
+            if effective_status == "confirmed" and not references:
+                effective_status = "lead_only"
+            relation = item.relationship
+            if references:
+                relation = f"{relation} {references}"
             values = [
                 item.name,
-                f"{item.kind} / {item.verification_status}",
-                item.relationship,
+                RELATED_KIND_LABELS.get(item.kind, item.kind),
+                RELATED_STATUS_LABELS.get(effective_status, effective_status),
+                relation,
             ]
             for index, (cell, text) in enumerate(zip(cells, values, strict=True)):
                 p = cell.paragraphs[0]
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER if index == 1 else WD_ALIGN_PARAGRAPH.LEFT
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER if index in {1, 2} else WD_ALIGN_PARAGRAPH.LEFT
                 run = p.add_run(text)
                 _set_run_font(run, size=9.5)
-        _set_table_geometry(table, [2160, 2160, 5040])
+        _set_table_geometry(table, [1800, 1200, 2040, 4320])
 
     for section_draft in draft.sections:
         document.add_heading(section_draft.heading, level=1)
@@ -238,7 +300,8 @@ def build_report_docx(
             source_p = document.add_paragraph()
             source_p.paragraph_format.space_before = Pt(4)
             source_p.paragraph_format.space_after = Pt(4)
-            run = source_p.add_run("本节来源：" + "；".join(section_draft.source_urls))
+            references = _source_reference_text(section_draft.source_urls, source_numbers)
+            run = source_p.add_run("本节证据：" + (references or "未形成有效来源映射"))
             _set_run_font(run, size=8.5, color=MUTED)
 
     document.add_heading("六、洞察总结", level=1)
@@ -250,6 +313,10 @@ def build_report_docx(
         _set_run_font(title_run, size=11, bold=True, color=DARK_BLUE)
         body_run = p.add_run(insight.analysis)
         _set_run_font(body_run, size=11)
+        references = _source_reference_text(insight.source_urls, source_numbers)
+        if references:
+            source_run = p.add_run(f" {references}")
+            _set_run_font(source_run, size=8.5, color=MUTED)
 
     if draft.limitations:
         document.add_heading("研究边界", level=1)
@@ -259,11 +326,14 @@ def build_report_docx(
     document.add_heading("主要数据来源一览", level=1)
     for index, source in enumerate(draft.sources, start=1):
         p = document.add_paragraph()
-        run = p.add_run(f"{index}.  {source.title}（{source.retrieval_status}）\n{source.url}")
+        level = SOURCE_LEVEL_LABELS.get(source.evidence_level, "其他公开资料")
+        access = f"；访问日期：{source.accessed_at}" if source.accessed_at else ""
+        inherited = "；身份核验阶段继承" if source.inherited_from_identity else ""
+        run = p.add_run(f"[{index}] {source.title}（{level}{access}{inherited}）\n{source.url}")
         _set_run_font(run, size=9.5)
 
     document.core_properties.title = draft.report_title
-    document.core_properties.subject = "法律AI产品标杆分析P2.3.1本地测试稿"
+    document.core_properties.subject = "法律AI产品标杆分析P2.3.2证据质量测试稿"
     document.core_properties.author = "法律AI分析Agent"
     document.core_properties.comments = "本地生成；不含数据库写入或训练。"
     document.save(output_path)
