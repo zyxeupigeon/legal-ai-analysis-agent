@@ -2,9 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+ReportParagraph = Annotated[str, Field(max_length=220)]
+ReportPoint = Annotated[str, Field(max_length=80)]
+ReportSummary = Annotated[str, Field(max_length=120)]
+ReportInsightText = Annotated[str, Field(max_length=180)]
 
 
 class TaskStatus(StrEnum):
@@ -99,26 +105,34 @@ class ReportSourceRecord(BaseModel):
 
 
 class ReportSectionDraft(BaseModel):
-    heading: str
-    paragraphs: list[str] = Field(default_factory=list, max_length=5)
-    key_points: list[str] = Field(default_factory=list, max_length=6)
+    heading: str = ""
+    paragraphs: list[ReportParagraph] = Field(default_factory=list, max_length=1)
+    key_points: list[ReportPoint] = Field(default_factory=list, max_length=2)
     source_urls: list[str] = Field(default_factory=list)
 
 
 class ReportInsightDraft(BaseModel):
     title: str
-    analysis: str
+    analysis: ReportInsightText
     source_urls: list[str] = Field(default_factory=list)
 
 
 class ReportDraft(BaseModel):
-    report_title: str
-    report_subtitle: str
-    executive_summary: list[str] = Field(min_length=1, max_length=6)
-    sections: list[ReportSectionDraft] = Field(min_length=5, max_length=5)
-    insights: list[ReportInsightDraft] = Field(min_length=1, max_length=6)
+    report_title: str = ""
+    report_subtitle: str = ""
+    executive_summary: list[ReportSummary] = Field(min_length=1, max_length=3)
+    sections: list[ReportSectionDraft] = Field(min_length=1, max_length=7)
+    insights: list[ReportInsightDraft] = Field(min_length=1, max_length=3)
     limitations: list[str] = Field(default_factory=list, max_length=10)
     sources: list[ReportSourceRecord] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def ignore_model_supplied_source_ledger(cls, value):
+        if isinstance(value, dict):
+            value = dict(value)
+            value["sources"] = []
+        return value
 
 
 class ReportArtifact(BaseModel):
