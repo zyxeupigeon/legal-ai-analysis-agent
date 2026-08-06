@@ -1,7 +1,7 @@
 [project]
 name = "legal-ai-analysis-agent-api"
-version = "0.5.0"
-description = "P2.3.3 local legal AI claim-evidence and logic-guard Word report test build"
+version = "0.6.0"
+description = "P2.3.4 local legal AI citation relevance and conflict handling Word report test build"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi==0.141.1",

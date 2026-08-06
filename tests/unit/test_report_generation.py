@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 from docx import Document
@@ -34,18 +35,58 @@ class FakeModel:
         self.payload = payload
 
     def generate_json(self, system_prompt: str, user_prompt: str) -> str:
+        if "证据相关性审计" in user_prompt:
+            match = re.search(r"待审目标：\n(.*?)\n\n任务卡片与实际公开证据", user_prompt, re.S)
+            assert match
+            targets = json.loads(match.group(1))
+            return json.dumps(
+                {
+                    "items": [
+                        {
+                            "target_id": item["target_id"],
+                            "status": "supported",
+                            "supported_urls": item["candidate_urls"],
+                            "reason": "虚构测试中视为直接支持。",
+                        }
+                        for item in targets
+                    ]
+                },
+                ensure_ascii=False,
+            )
         assert "不得使用模型记忆" in system_prompt
         assert "actual.example/product" in user_prompt
         return json.dumps(self.payload, ensure_ascii=False)
 
 
 class SequenceModel(FakeModel):
-    def __init__(self, payloads: list[dict]) -> None:
+    def __init__(self, payloads: list[dict], audit_statuses: list[str] | None = None) -> None:
         self.payloads = list(payloads)
+        self.audit_statuses = list(audit_statuses or [])
         self.prompts: list[str] = []
 
     def generate_json(self, system_prompt: str, user_prompt: str) -> str:
         self.prompts.append(user_prompt)
+        if "证据相关性审计" in user_prompt:
+            if self.audit_statuses:
+                match = re.search(r"待审目标：\n(.*?)\n\n任务卡片与实际公开证据", user_prompt, re.S)
+                assert match
+                targets = json.loads(match.group(1))
+                status = self.audit_statuses.pop(0)
+                return json.dumps(
+                    {
+                        "items": [
+                            {
+                                "target_id": item["target_id"],
+                                "status": status,
+                                "supported_urls": item["candidate_urls"] if status == "supported" else [],
+                                "reason": "测试证据相关性结果。",
+                            }
+                            for item in targets
+                        ]
+                    },
+                    ensure_ascii=False,
+                )
+            return FakeModel.generate_json(self, system_prompt, user_prompt)
         return json.dumps(self.payloads.pop(0), ensure_ascii=False)
 
 
@@ -142,8 +183,9 @@ def test_report_provider_repairs_missing_claim_citations_once() -> None:
     draft = provider.generate(fixture_task())
 
     assert draft.executive_summary_source_urls == ["https://actual.example/product"]
-    assert len(model.prompts) == 2
+    assert len(model.prompts) == 3
     assert "引用修复任务" in model.prompts[1]
+    assert "证据相关性审计" in model.prompts[2]
 
 
 def test_report_provider_repairs_invalid_contract_once() -> None:
@@ -158,8 +200,20 @@ def test_report_provider_repairs_invalid_contract_once() -> None:
     draft = provider.generate(fixture_task())
 
     assert len(draft.sections) == 5
-    assert len(model.prompts) == 2
+    assert len(model.prompts) == 3
     assert "格式修复任务" in model.prompts[1]
+
+
+def test_report_provider_repairs_citation_relevance_and_reaudits() -> None:
+    valid = report_payload(["https://actual.example/product"])
+    model = SequenceModel([valid, valid], audit_statuses=["partial", "supported"])
+    provider = EvidenceBoundReportDraftProvider(model, FakeSearch())
+
+    draft = provider.generate(fixture_task())
+
+    assert draft.sections[0].source_urls == ["https://actual.example/product"]
+    assert any("证据相关性修复任务" in prompt for prompt in model.prompts)
+    assert sum("证据相关性审计" in prompt for prompt in model.prompts) == 2
 
 
 def test_report_provider_normalizes_short_section_list_without_inventing_facts() -> None:
@@ -241,7 +295,40 @@ def test_reviewed_logic_errors_and_unverified_regulatory_claims_are_downgraded()
     assert "存在矛盾" not in combined
     assert "影响公信力" not in combined
     assert "虚高" not in combined
-    assert "未取得监管名单" in combined
+    assert "未取得监管公开名单" in combined
+
+
+def test_timeline_conflict_is_recorded_without_calling_it_a_contradiction() -> None:
+    class TimelineSearch(FakeSearch):
+        def search(self, query: str, *, max_results: int = 5) -> list[SearchDocument]:
+            return [
+                SearchDocument(
+                    query=query,
+                    title="产品说明",
+                    url="https://actual.example/product",
+                    content="产品说明称由联合实验室历经8年研发推出。",
+                    retrieval_status="readable",
+                ),
+                SearchDocument(
+                    query=query,
+                    title="科研机构合作记录",
+                    url="https://www.example.ac.cn/cooperation",
+                    content="2019年双方合作成立法律人工智能联合实验室。",
+                    retrieval_status="readable",
+                ),
+            ]
+
+    provider = EvidenceBoundReportDraftProvider(
+        FakeModel(report_payload(["https://actual.example/product"])),
+        TimelineSearch(),
+    )
+
+    draft = provider.generate(fixture_task())
+
+    note = next(item for item in draft.limitations if "时间口径差异" in item)
+    assert "历经8年研发" in note
+    assert "2019年成立" in note
+    assert "不能直接视为矛盾" in note
 
 
 def test_platform_and_research_sources_are_not_labeled_official_primary() -> None:
@@ -284,6 +371,7 @@ def test_word_builder_creates_editable_document(tmp_path) -> None:
 
     assert output.read_bytes().startswith(b"PK")
     assert "衡法智研标杆分析报告" in text
+    assert "本报告仅用于自动化测试，不包含真实企业事实。  [1]" in text
     assert all(heading in text for heading in REPORT_SECTION_HEADINGS)
     assert "主要数据来源一览" in text
     assert "本节证据：[1]" in text

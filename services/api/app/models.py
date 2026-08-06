@@ -134,6 +134,7 @@ class ReportDraft(BaseModel):
     report_subtitle: str = ""
     executive_summary: list[ReportSummary] = Field(min_length=1, max_length=3)
     executive_summary_source_urls: list[str] = Field(default_factory=list, max_length=12)
+    executive_summary_item_source_urls: list[list[str]] = Field(default_factory=list, max_length=3)
     sections: list[ReportSectionDraft] = Field(min_length=1, max_length=7)
     insights: list[ReportInsightDraft] = Field(min_length=1, max_length=3)
     limitations: list[str] = Field(default_factory=list, max_length=10)
@@ -145,7 +146,19 @@ class ReportDraft(BaseModel):
         if isinstance(value, dict):
             value = dict(value)
             value["sources"] = []
+            value["executive_summary_item_source_urls"] = []
         return value
+
+
+class CitationAuditItem(BaseModel):
+    target_id: str
+    status: Literal["supported", "partial", "unsupported"]
+    supported_urls: list[str] = Field(default_factory=list, max_length=12)
+    reason: str = Field(max_length=240)
+
+
+class CitationAuditResult(BaseModel):
+    items: list[CitationAuditItem] = Field(min_length=1, max_length=20)
 
 
 class ReportArtifact(BaseModel):
