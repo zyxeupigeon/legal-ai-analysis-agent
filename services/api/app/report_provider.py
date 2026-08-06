@@ -168,10 +168,12 @@ class EvidenceBoundReportDraftProvider:
 五个主体章节必须按以下顺序组织；证据不足时保留标题但缩短内容并说明边界：
 {json.dumps(REPORT_SECTION_HEADINGS, ensure_ascii=False)}
 
+长度要求：executive_summary写2至3条；每个主体章节只写1个不超过220字的paragraph、最多2个短key_points；insights写2至3条且每条analysis不超过180字。必须优先保证JSON完整闭合，不得为了篇幅扩写。sources必须输出空数组，系统会依据有效引用自动回填。
+
 任务卡片与实际公开证据：
 {self._context(task, documents)}
 
-输出JSON必须符合以下Schema；sources字段可以留空，系统会根据实际引用自动回填：
+输出JSON必须符合以下Schema：
 {schema}
 """
         draft = generate_validated_json(
@@ -184,6 +186,14 @@ class EvidenceBoundReportDraftProvider:
         product = task.canonical_product_name or task.submitted_product_name
         draft.report_title = f"{product}标杆分析报告"
         draft.report_subtitle = "法律科技赛道 · P2.3.1本地测试稿"
+        draft.sections = draft.sections[:5]
+        while len(draft.sections) < 5:
+            draft.sections.append(
+                ReportSectionDraft(
+                    paragraphs=["当前公开证据不足以形成可靠结论。"],
+                    key_points=["本维度暂不作强判断。"],
+                )
+            )
         for heading, section in zip(REPORT_SECTION_HEADINGS, draft.sections, strict=True):
             section.heading = heading
         if self.search.search_tier == "test_only":

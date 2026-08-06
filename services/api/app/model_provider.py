@@ -70,7 +70,7 @@ class ChatCompletionsSettings:
     base_url: str
     timeout_seconds: float = 90.0
     max_retries: int = 1
-    max_tokens: int = 4096
+    max_tokens: int = 8192
 
     @classmethod
     def deepseek_from_env(cls) -> "ChatCompletionsSettings":
@@ -83,7 +83,7 @@ class ChatCompletionsSettings:
             base_url=os.getenv("DEEPSEEK_API_BASE_URL", "https://api.deepseek.com").rstrip("/"),
             timeout_seconds=float(os.getenv("TOOL_TIMEOUT_SECONDS", "90") or "90"),
             max_retries=max(0, int(os.getenv("MAX_TOOL_RETRIES", "1") or "1")),
-            max_tokens=max(512, int(os.getenv("MODEL_MAX_OUTPUT_TOKENS", "4096") or "4096")),
+            max_tokens=max(512, int(os.getenv("MODEL_MAX_OUTPUT_TOKENS", "8192") or "8192")),
         )
 
     @classmethod
@@ -97,7 +97,7 @@ class ChatCompletionsSettings:
             base_url=os.getenv("MODEL_API_BASE_URL", "").rstrip("/"),
             timeout_seconds=float(os.getenv("TOOL_TIMEOUT_SECONDS", "90") or "90"),
             max_retries=max(0, int(os.getenv("MAX_TOOL_RETRIES", "1") or "1")),
-            max_tokens=max(512, int(os.getenv("MODEL_MAX_OUTPUT_TOKENS", "4096") or "4096")),
+            max_tokens=max(512, int(os.getenv("MODEL_MAX_OUTPUT_TOKENS", "8192") or "8192")),
         )
 
 
