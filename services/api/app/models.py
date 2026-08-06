@@ -106,6 +106,8 @@ class ReportSourceRecord(BaseModel):
     evidence_level: Literal[
         "government_record",
         "official_primary",
+        "platform_listing",
+        "research_institution",
         "independent_secondary",
         "other_public",
         "test_fixture",
@@ -131,7 +133,7 @@ class ReportDraft(BaseModel):
     report_title: str = ""
     report_subtitle: str = ""
     executive_summary: list[ReportSummary] = Field(min_length=1, max_length=3)
-    executive_summary_source_urls: list[str] = Field(default_factory=list)
+    executive_summary_source_urls: list[str] = Field(default_factory=list, max_length=12)
     sections: list[ReportSectionDraft] = Field(min_length=1, max_length=7)
     insights: list[ReportInsightDraft] = Field(min_length=1, max_length=3)
     limitations: list[str] = Field(default_factory=list, max_length=10)

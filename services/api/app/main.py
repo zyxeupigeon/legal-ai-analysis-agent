@@ -23,7 +23,7 @@ from .service import (
 from .store import InMemoryTaskStore
 
 
-APP_VERSION = "0.4.0"
+APP_VERSION = "0.5.0"
 
 
 def create_app(
@@ -44,7 +44,7 @@ def create_app(
     application = FastAPI(
         title="法律AI分析Agent API",
         version=APP_VERSION,
-        description="P2.3.2本地法律AI身份核验、证据继承与分级、报告草稿和Word导出；不建库、不训练。",
+        description="P2.3.3本地法律AI身份核验、逐段证据绑定、逻辑校验和Word导出；不建库、不训练。",
     )
     application.state.task_store = active_store
     application.state.identity_provider = active_provider

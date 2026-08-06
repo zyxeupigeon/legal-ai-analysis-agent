@@ -26,6 +26,8 @@ TABLE_INDENT_DXA = 120
 SOURCE_LEVEL_LABELS = {
     "government_record": "政府或监管公开记录",
     "official_primary": "官方原始资料",
+    "platform_listing": "应用商店或分发平台资料",
+    "research_institution": "科研机构公开资料",
     "independent_secondary": "第三方公开资料",
     "other_public": "其他公开资料",
     "test_fixture": "虚构测试资料",
@@ -163,7 +165,7 @@ def _safe_file_component(value: str) -> str:
 
 def report_file_name(task: Task, generated_on: date) -> str:
     product = _safe_file_component(task.canonical_product_name or task.submitted_product_name)
-    return f"{product}标杆分析报告_法律科技赛道.V0.2.P2.3.2测试稿.{generated_on:%Y%m%d}.docx"
+    return f"{product}标杆分析报告_法律科技赛道.V0.3.P2.3.3测试稿.{generated_on:%Y%m%d}.docx"
 
 
 def _source_reference_text(urls: list[str], source_numbers: dict[str, int]) -> str:
@@ -199,7 +201,7 @@ def build_report_docx(
 
     header = section.header.paragraphs[0]
     header.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    run = header.add_run("法律 AI 产品标杆分析 | P2.3.2 证据质量测试稿")
+    run = header.add_run("法律 AI 产品标杆分析 | P2.3.3 主张—证据绑定测试稿")
     _set_run_font(run, size=9, color=MUTED)
     _add_page_number(section.footer.paragraphs[0])
 
@@ -323,6 +325,7 @@ def build_report_docx(
         for item in draft.limitations:
             document.add_paragraph(item, style="List Bullet")
 
+    document.add_page_break()
     document.add_heading("主要数据来源一览", level=1)
     for index, source in enumerate(draft.sources, start=1):
         p = document.add_paragraph()
@@ -333,7 +336,7 @@ def build_report_docx(
         _set_run_font(run, size=9.5)
 
     document.core_properties.title = draft.report_title
-    document.core_properties.subject = "法律AI产品标杆分析P2.3.2证据质量测试稿"
+    document.core_properties.subject = "法律AI产品标杆分析P2.3.3主张—证据绑定测试稿"
     document.core_properties.author = "法律AI分析Agent"
     document.core_properties.comments = "本地生成；不含数据库写入或训练。"
     document.save(output_path)

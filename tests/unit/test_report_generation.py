@@ -2,6 +2,7 @@ import json
 
 import pytest
 from docx import Document
+from docx.oxml.ns import qn
 
 from services.api.app.models import (
     EvidenceSource,
@@ -88,6 +89,7 @@ def report_payload(source_urls: list[str]) -> dict:
         "report_title": "会被系统覆盖",
         "report_subtitle": "会被系统覆盖",
         "executive_summary": ["测试摘要。"],
+        "executive_summary_source_urls": source_urls,
         "sections": [
             {
                 "heading": f"模型自拟标题{index}",
@@ -127,8 +129,21 @@ def test_report_provider_rejects_draft_without_real_citation() -> None:
         FakeModel(report_payload(["https://invented.example"])),
         FakeSearch(),
     )
-    with pytest.raises(ProviderInvalidResponse, match="没有引用任何实际检索来源"):
+    with pytest.raises(ProviderInvalidResponse, match="未完成主张—证据绑定"):
         provider.generate(fixture_task())
+
+
+def test_report_provider_repairs_missing_claim_citations_once() -> None:
+    missing = report_payload([])
+    valid = report_payload(["https://actual.example/product"])
+    model = SequenceModel([missing, valid])
+    provider = EvidenceBoundReportDraftProvider(model, FakeSearch())
+
+    draft = provider.generate(fixture_task())
+
+    assert draft.executive_summary_source_urls == ["https://actual.example/product"]
+    assert len(model.prompts) == 2
+    assert "引用修复任务" in model.prompts[1]
 
 
 def test_report_provider_repairs_invalid_contract_once() -> None:
@@ -207,6 +222,57 @@ def test_unsupported_strong_conclusions_are_downgraded() -> None:
     assert "行业领先" not in combined
 
 
+def test_reviewed_logic_errors_and_unverified_regulatory_claims_are_downgraded() -> None:
+    payload = report_payload(["https://actual.example/product"])
+    payload["executive_summary"] = ["得理法律大模型通过国家网信办备案，表明具备变现能力。"]
+    payload["sections"][0]["paragraphs"] = ["8年研发与成立时间存在矛盾，影响公信力。"]
+    payload["insights"][0]["analysis"] = "行业势能存在虚高可能。"
+    provider = EvidenceBoundReportDraftProvider(FakeModel(payload), FakeSearch())
+
+    draft = provider.generate(fixture_task())
+    combined = " ".join(
+        draft.executive_summary
+        + draft.sections[0].paragraphs
+        + [draft.insights[0].analysis]
+    )
+
+    assert "通过国家网信办备案" not in combined
+    assert "表明具备变现能力" not in combined
+    assert "存在矛盾" not in combined
+    assert "影响公信力" not in combined
+    assert "虚高" not in combined
+    assert "未取得监管名单" in combined
+
+
+def test_platform_and_research_sources_are_not_labeled_official_primary() -> None:
+    task = fixture_task()
+    platform_url = "https://apps.apple.com/cn/app/example/id1"
+    research_url = "https://www.example.ac.cn/news/legal-ai.html"
+    task.sources = [
+        EvidenceSource(
+            url=platform_url,
+            title="应用商店页面",
+            source_type="official_product",
+            supports=["identity"],
+        ),
+        EvidenceSource(
+            url=research_url,
+            title="科研机构合作信息",
+            source_type="official_product",
+            supports=["ecosystem"],
+        ),
+    ]
+    payload = report_payload([platform_url])
+    payload["sections"][0]["source_urls"] = [research_url]
+    provider = EvidenceBoundReportDraftProvider(FakeModel(payload), FakeSearch())
+
+    draft = provider.generate(task)
+    levels = {source.url: source.evidence_level for source in draft.sources}
+
+    assert levels[platform_url] == "platform_listing"
+    assert levels[research_url] == "research_institution"
+
+
 def test_word_builder_creates_editable_document(tmp_path) -> None:
     task = fixture_task()
     draft = FixtureReportDraftProvider().generate(task)
@@ -222,6 +288,15 @@ def test_word_builder_creates_editable_document(tmp_path) -> None:
     assert "主要数据来源一览" in text
     assert "本节证据：[1]" in text
     assert "[1] 虚构自动化测试来源" in text
+
+    source_heading_index = next(
+        index
+        for index, paragraph in enumerate(document.paragraphs)
+        if paragraph.text == "主要数据来源一览"
+    )
+    preceding = document.paragraphs[source_heading_index - 1]
+    page_breaks = preceding._p.findall(f".//{qn('w:br')}")
+    assert any(node.get(qn("w:type")) == "page" for node in page_breaks)
 
 
 def test_word_builder_downgrades_unmapped_confirmed_ecosystem_item(tmp_path) -> None:
