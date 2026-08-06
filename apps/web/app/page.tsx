@@ -66,6 +66,19 @@ type Task = {
   phase_limit_reached: boolean;
   created_at: string;
   events: TaskEvent[];
+  report_status: "not_started" | "ready" | "failed";
+  report_file_name: string | null;
+  report_version: string | null;
+  report_generated_at: string | null;
+};
+
+type ReportArtifact = {
+  task_id: string;
+  report_status: string;
+  file_name: string;
+  version: string;
+  generated_at: string;
+  download_url: string;
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -156,18 +169,36 @@ export default function Home() {
     }
   }
 
+  async function generateReport() {
+    if (!currentTask) return;
+    setLoading(true);
+    setError("");
+    try {
+      await request<ReportArtifact>(`/api/tasks/${currentTask.task_id}/reports`, {
+        method: "POST",
+      });
+      const task = await request<Task>(`/api/tasks/${currentTask.task_id}`);
+      setCurrentTask(task);
+      await refreshTasks();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "报告生成失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <main>
       <section className="hero">
         <div className="eyebrow">LEGAL AI PRODUCT INTELLIGENCE</div>
         <h1>先确认产品，<br />再开始分析。</h1>
-        <p className="hero-copy">大陆可用测试版 P2.2.2 · Agent核心 V1.1</p>
+        <p className="hero-copy">本地报告测试版 P2.3.1 · Agent核心 V1.1</p>
         <div className="phase-strip" aria-label="当前实现进度">
           <span className="phase active">01 产品输入</span>
           <span className="phase active">02 身份闸门</span>
           <span className="phase active">03 澄清确认</span>
           <span className="phase active">04 公开检索</span>
-          <span className="phase muted">05 Word报告</span>
+          <span className="phase active">05 Word报告</span>
         </div>
       </section>
 
@@ -198,20 +229,21 @@ export default function Home() {
             <strong>{health?.search_tier === "test_only" ? "测试级真实检索" : "真实检索"}</strong>
             <span>模型与公开网页搜索可以分别替换</span>
             <span>当前：{health ? `${health.model_provider} + ${health.search_provider}` : "正在读取配置"}</span>
-            {health?.search_tier === "test_only" && <span>免搜索密钥，但不用于正式报告</span>}
+            {health?.search_tier === "test_only" && <span>免搜索密钥，仅用于本地报告测试</span>}
           </div>
           {error && <p className="error" role="alert">{error}</p>}
         </section>
 
         <aside className="panel scope-panel">
-          <span className="label">P2.2.2 范围</span>
-          <h2>先核验，再给结论</h2>
+          <span className="label">P2.3.1 范围</span>
+          <h2>先核验，再生成Word</h2>
           <ul>
             <li>名称不清楚，就停下询问</li>
             <li>确认前不扩展同企业生态</li>
             <li>非法律AI产品直接终止</li>
             <li>API、MCP和插件分别核验</li>
-            <li>不建库、不训练、不生成报告</li>
+            <li>生成证据约束的Word测试稿</li>
+            <li>不建库、不部署、不训练</li>
           </ul>
           <div className={`local-pill ${health?.provider_ready ? "" : "not-ready"}`}>
             <span /> {health?.message ?? "正在检查本地API与检索配置…"}
@@ -319,8 +351,29 @@ export default function Home() {
             </div>
           )}
 
+          {currentTask.identity_gate === "confirmed" && (
+            <div className="report-action">
+              <div>
+                <span className="label">P2.3.1 WORD</span>
+                <h3>{currentTask.report_status === "ready" ? "Word测试稿已生成" : "生成本地Word测试稿"}</h3>
+                <p>继续检索报告所需公开证据；证据不足的章节会缩减，不允许模型凭记忆补写。</p>
+              </div>
+              {currentTask.report_status === "ready" ? (
+                <a
+                  className="download-button"
+                  href={`${API_BASE}/api/tasks/${currentTask.task_id}/reports/latest/download`}
+                >下载 Word</a>
+              ) : (
+                <button type="button" disabled={loading} onClick={() => void generateReport()}>
+                  {loading ? "正在生成…" : "生成 Word 测试稿"}
+                </button>
+              )}
+              {currentTask.report_file_name && <small>{currentTask.report_file_name}</small>}
+            </div>
+          )}
+
           {currentTask.phase_limit_reached && (
-            <div className="phase-limit"><strong>P2.2.2 已到达阶段终点</strong><span>{currentTask.next_action}</span></div>
+            <div className="phase-limit"><strong>P2.3.1 已到达阶段终点</strong><span>{currentTask.next_action}</span></div>
           )}
           <p className="task-id">任务 ID · {currentTask.task_id}</p>
         </section>
@@ -345,7 +398,7 @@ export default function Home() {
         )}
       </section>
 
-      <footer>法律AI分析Agent · 本页面只做公开身份与生态线索核验，不提供法律意见或正式报告。</footer>
+      <footer>法律AI分析Agent · 本页面生成本地证据约束Word测试稿，不提供法律意见、审计或投资结论。</footer>
     </main>
   );
 }
