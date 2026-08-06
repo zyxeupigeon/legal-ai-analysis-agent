@@ -76,4 +76,4 @@ def test_recorded_public_product_result_flows_through_real_provider_contract() -
     assert task["related_products"][0]["kind"] == "api"
     assert all(item["kind"] != "mcp" for item in task["related_products"])
     assert task["web_search_used"] is True
-    assert task["phase_limit_reached"] is True
+    assert task["phase_limit_reached"] is False
