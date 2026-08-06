@@ -114,11 +114,11 @@ class TaskService:
             raise
         task.report_status = ReportStatus.READY
         task.report_file_name = file_name
-        task.report_version = "0.1-p2.3.1-test"
+        task.report_version = "0.2-p2.3.2-test"
         task.report_generated_at = generated_at
         task.phase_limit_reached = True
-        task.status_message = "已生成证据约束的P2.3.1本地Word测试稿。"
-        task.next_action = "请下载并人工检查内容质量；当前仍不建库、不部署、不训练。"
+        task.status_message = "已生成带来源映射和证据等级的P2.3.2本地Word测试稿。"
+        task.next_action = "请下载检查证据覆盖与结论强度；当前仍不建库、不部署、不训练。"
         task.updated_at = generated_at
         self.store.save(task)
         return ReportArtifact(
@@ -189,7 +189,7 @@ class TaskService:
         task.candidates = []
         task.clarification_question = None
         task.status_message = "身份、运营主体与法律AI边界已完成公开核验；相关AI产品/API/MCP线索已识别。"
-        task.next_action = "可以生成P2.3.1本地Word测试稿。"
+        task.next_action = "可以生成P2.3.2证据质量Word测试稿。"
         task.phase_limit_reached = False
         transition(task, TaskStatus.RESEARCHING, reason)
 

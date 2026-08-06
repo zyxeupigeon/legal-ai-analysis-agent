@@ -1,5 +1,5 @@
 manifest_version: "1.1"
-project_phase: "P2.3.1"
+project_phase: "P2.3.2"
 repository_visibility: "private"
 repository_owner_type: "personal"
 
@@ -23,11 +23,11 @@ frozen_files:
   task_boundary_docx_sha256: "aacb93d6ff99c551bbe11fa8258f89eacf3858f106b447d85478d8f43a29379d"
 
 implementation:
-  app_version: "0.3.3"
-  api_contract_version: "0.3.3"
+  app_version: "0.4.0"
+  api_contract_version: "0.4.0"
   event_contract_version: "0.1.0"
   database_schema_version: "not_started"
-  report_template_version: "0.1-p2.3.1-test"
+  report_template_version: "0.2-p2.3.2-test"
   evaluation_set_version: "0.1.0"
 
 data_policy:
@@ -45,7 +45,7 @@ providers:
   supported_identity_modes: ["deepseek", "compatible", "openai", "fixture"]
   secrets_in_repository: false
 
-p2_3_1_guards:
+p2_3_2_guards:
   business_code_allowed: true
   real_secrets_allowed: false
   user_materials_allowed: false
