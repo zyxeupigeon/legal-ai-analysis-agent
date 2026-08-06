@@ -257,7 +257,8 @@ def test_external_search_runs_ecosystem_only_after_clear_identity() -> None:
 
     result = provider.research("公开法务助手")
 
-    assert len(search.queries) == 6
+    assert len(search.queries) == 7
+    assert any("Skill 插件 连接器" in query for query in search.queries)
     assert len(model.prompts) == 2
     assert result.outcome == "clear"
     assert result.web_search_used is True
