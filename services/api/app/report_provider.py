@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from .identity_provider import ExternalSearchIdentityProvider, FixtureIdentityResearchProvider
 from .model_provider import StructuredModelProvider, generate_validated_json
 from .models import (
+    CitationAuditResult,
     ReportDraft,
     ReportInsightDraft,
     ReportSectionDraft,
@@ -28,7 +29,7 @@ REPORT_SECTION_HEADINGS = [
 ]
 
 
-REPORT_SYSTEM_PROMPT = """你是法律AI产品标杆分析报告起草Agent，只执行P2.3.3主张—证据绑定测试稿生成。
+REPORT_SYSTEM_PROMPT = """你是法律AI产品标杆分析报告起草Agent，只执行P2.3.4证据相关性与冲突处理测试稿生成。
 
 必须遵守：
 1. 只使用用户任务卡片和本轮实际检索证据，不得使用模型记忆补充产品、企业、价格、客户、融资、功能、团队或市场事实，不得捏造URL。
@@ -43,6 +44,9 @@ REPORT_SYSTEM_PROMPT = """你是法律AI产品标杆分析报告起草Agent，�
 7.3 备案结论必须引用政府或监管公开记录；只有企业官网或应用商店自述时，必须写“企业公开资料称”，不得写成监管事实。
 8. 洞察总结形成“企业特有机制或矛盾—事实依据—约束条件—业务含义”闭环，控制在4至6条；证据不足时可以少于4条。
 9. executive_summary_source_urls、每个section.source_urls和每个insight.source_urls都必须填写支持相应主张的实际证据URL；不得仅生成总来源清单而让正文无引用。URL只能来自证据中实际出现的值。
+9.1 同一段包含多个事实时，所列来源合计必须直接支持其中每项重要事实；只与产品名称相关但不支持具体主张的网页不得引用。
+9.2 API、MCP、插件、连接器和Skill分别判断。发现Skill不能写成MCP；发现API不能推定存在插件、连接器或MCP。
+9.3 不同来源的研发年限、实验室成立年份、公司成立年份等口径不同，不得强行合并；应说明口径差异和目前能确认的范围。
 10. 不提供个案法律意见，不把测试稿表述为审计、投资、尽调或法律意见。
 11. 使用简体中文，只输出符合给定结构的JSON对象，不输出Markdown或额外说明。"""
 
@@ -58,7 +62,7 @@ def _normalize_url(url: str) -> str:
     return url.split("#", 1)[0].rstrip("/")
 
 
-def _dedupe_documents(documents: list[SearchDocument], limit: int = 18) -> list[SearchDocument]:
+def _dedupe_documents(documents: list[SearchDocument], limit: int = 28) -> list[SearchDocument]:
     kept: list[SearchDocument] = []
     seen: set[str] = set()
     for document in documents:
@@ -122,24 +126,34 @@ def _moderate_claim_strength(text: str) -> str:
 def _moderate_regulatory_claim(text: str, *, has_regulatory_source: bool) -> str:
     if has_regulatory_source:
         return text
-    replacements = {
-        "得理法律大模型为首批通过国家网信办备案的生成式算法之一": "企业公开资料称得理法律大模型已完成相关备案，但本次未取得监管名单的直接对应记录",
-        "得理法律大模型通过网信办备案": "企业公开资料称得理法律大模型已完成相关备案，但本次未取得监管名单的直接对应记录",
-        "得理法律大模型通过国家网信办备案": "企业公开资料称得理法律大模型已完成相关备案，但本次未取得监管名单的直接对应记录",
-    }
-    for strong, moderate in replacements.items():
-        text = text.replace(strong, moderate)
-    text = re.sub(
-        r"([^。；，]{1,50})(?:为|是)首批通过国家网信办备案的生成式算法之一",
-        r"据企业公开资料称，\1较早完成相关备案；本次未取得监管名单的直接对应记录",
-        text,
+    claim_pattern = re.compile(r"(?:首批.{0,12})?(?:通过|完成).{0,12}(?:网信办|备案)|首批.{0,24}备案")
+    sentences = re.findall(r"[^。！？]+[。！？]?", text)
+    rewritten: list[str] = []
+    for sentence in sentences:
+        if not claim_pattern.search(sentence):
+            rewritten.append(sentence)
+            continue
+        subjects = re.findall(r"[\u4e00-\u9fffA-Za-z0-9·-]{2,24}(?:大模型|算法|服务)", sentence)
+        subject = subjects[-1] if subjects else "相关模型或算法"
+        rewritten.append(
+            f"企业公开资料称{subject}已完成相关备案，但本次未取得监管公开名单的直接对应记录。"
+        )
+    return "".join(rewritten) or text
+
+
+def _timeline_conflict_note(documents: list[SearchDocument]) -> str | None:
+    combined = "\n".join(item.content for item in documents)
+    duration_match = re.search(r"历经\s*(\d{1,2})\s*年", combined)
+    founded_match = re.search(
+        r"(20\d{2})年[^。\n]{0,80}(?:(?:联合实验室|实验室)[^。\n]{0,20}(?:成立|共建)|(?:成立|共建)[^。\n]{0,40}(?:联合实验室|实验室))",
+        combined,
     )
-    text = re.sub(
-        r"([^。；，]{1,50})通过(?:国家)?网信办备案",
-        r"据企业公开资料称，\1已完成相关备案；本次未取得监管名单的直接对应记录",
-        text,
+    if not duration_match or not founded_match:
+        return None
+    return (
+        f"公开材料存在时间口径差异：部分产品说明称“历经{duration_match.group(1)}年研发”，"
+        f"另有机构公开资料记载相关联合实验室于{founded_match.group(1)}年成立；二者可能分别指团队研发历史与实验室存续时间，不能直接视为矛盾或相互替代。"
     )
-    return text
 
 
 def _citation_gaps(draft: ReportDraft, allowed_urls: set[str] | None = None) -> list[str]:
@@ -174,6 +188,9 @@ class EvidenceBoundReportDraftProvider:
         product = task.canonical_product_name or task.submitted_product_name
         operator = task.operator_name or product
         queries = [
+            f'"{operator}" 联合实验室 site:ac.cn',
+            f'"{operator}" 开放平台 API Skill 插件 连接器 MCP',
+            f'"{product}" "{operator}" 备案 site:cac.gov.cn',
             f'"{product}" 官网 产品 功能 服务',
             f'"{product}" 价格 套餐 用户协议 隐私政策',
             f'"{operator}" 官网 AI 产品 开放平台 API',
@@ -187,7 +204,7 @@ class EvidenceBoundReportDraftProvider:
         failures: list[str] = []
         for query in queries:
             try:
-                documents.extend(self.search.search(query, max_results=5))
+                documents.extend(self.search.search(query, max_results=3)[:3])
             except ProviderUnavailable as exc:
                 failures.append(str(exc))
         deduplicated = _dedupe_documents(documents)
@@ -224,6 +241,114 @@ class EvidenceBoundReportDraftProvider:
             ensure_ascii=False,
             indent=2,
         )
+
+    @staticmethod
+    def _audit_targets(draft: ReportDraft) -> list[dict[str, object]]:
+        targets: list[dict[str, object]] = []
+        for index, summary in enumerate(draft.executive_summary, start=1):
+            targets.append(
+                {
+                    "target_id": f"summary:{index}",
+                    "text": summary,
+                    "candidate_urls": draft.executive_summary_source_urls,
+                }
+            )
+        for index, section in enumerate(draft.sections, start=1):
+            if section.paragraphs == ["当前公开证据不足以形成可靠结论。"]:
+                continue
+            targets.append(
+                {
+                    "target_id": f"section:{index}",
+                    "text": " ".join(section.paragraphs + section.key_points),
+                    "candidate_urls": section.source_urls,
+                }
+            )
+        for index, insight in enumerate(draft.insights, start=1):
+            targets.append(
+                {
+                    "target_id": f"insight:{index}",
+                    "text": f"{insight.title}：{insight.analysis}",
+                    "candidate_urls": insight.source_urls,
+                }
+            )
+        return targets
+
+    def _audit_citations(
+        self,
+        draft: ReportDraft,
+        documents: list[SearchDocument],
+        task: Task,
+    ) -> tuple[CitationAuditResult, list[str]]:
+        targets = self._audit_targets(draft)
+        schema = json.dumps(CitationAuditResult.model_json_schema(), ensure_ascii=False)
+        prompt = f"""证据相关性审计：逐项判断候选URL是否直接支持目标文本中的重要事实。
+
+规则：
+1. 只有来源正文直接支持目标中的具体事实，才能列入supported_urls；仅出现产品名、企业名或相邻概念不算支持。
+2. 目标含多个重要事实时，supported_urls合计必须覆盖全部重要事实才能标记supported；只覆盖部分标记partial；均不支持标记unsupported。
+3. 分析判断允许由事实来源支撑，但必须保留条件和限制，不能把企业宣传升级为独立事实。
+4. API、MCP、插件、连接器、Skill分别审核，不能互相替代。
+5. 只使用证据中实际出现的URL，不得补造。reason简要说明未覆盖的事实。
+
+待审目标：
+{json.dumps(targets, ensure_ascii=False, indent=2)}
+
+任务卡片与实际公开证据：
+{self._context(task, documents)}
+
+输出JSON必须符合：
+{schema}
+"""
+        audit = generate_validated_json(
+            self.model,
+            "你是报告证据相关性审计器，只核对来源与主张的直接支持关系，严格输出JSON。",
+            prompt,
+            CitationAuditResult,
+            contract_name="模型返回内容不符合P2.3.4证据相关性审计契约",
+        )
+        expected = {str(item["target_id"]) for item in targets}
+        by_target = {item.target_id: item for item in audit.items if item.target_id in expected}
+        allowed_urls = {
+            _normalize_url(item.url) for item in documents
+        } | {
+            _normalize_url(item.url) for item in task.sources
+        }
+        failures: list[str] = []
+        for target_id in sorted(expected):
+            item = by_target.get(target_id)
+            if item is None or item.status != "supported":
+                failures.append(target_id)
+                continue
+            item.supported_urls = [
+                url for url in item.supported_urls if _normalize_url(url) in allowed_urls
+            ]
+            if not item.supported_urls:
+                failures.append(target_id)
+        return audit, failures
+
+    @staticmethod
+    def _apply_audit_urls(draft: ReportDraft, audit: CitationAuditResult) -> None:
+        by_target = {item.target_id: item for item in audit.items if item.status == "supported"}
+        summary_urls: list[str] = []
+        summary_item_urls: list[list[str]] = []
+        for index in range(1, len(draft.executive_summary) + 1):
+            item = by_target.get(f"summary:{index}")
+            item_urls = item.supported_urls if item else []
+            summary_item_urls.append(item_urls)
+            if item:
+                for url in item.supported_urls:
+                    if url not in summary_urls:
+                        summary_urls.append(url)
+        draft.executive_summary_source_urls = summary_urls
+        draft.executive_summary_item_source_urls = summary_item_urls
+        for index, section in enumerate(draft.sections, start=1):
+            item = by_target.get(f"section:{index}")
+            if item:
+                section.source_urls = item.supported_urls
+        for index, insight in enumerate(draft.insights, start=1):
+            item = by_target.get(f"insight:{index}")
+            if item:
+                insight.source_urls = item.supported_urls
 
     @staticmethod
     def _enforce_evidence(
@@ -360,7 +485,7 @@ class EvidenceBoundReportDraftProvider:
             raise ProviderNotConfigured("报告生成所需模型或搜索组件未就绪")
         documents = self._collect_documents(task)
         schema = json.dumps(ReportDraft.model_json_schema(), ensure_ascii=False)
-        prompt = f"""请为已通过身份闸门的法律AI产品制作P2.3.3本地Word测试稿。
+        prompt = f"""请为已通过身份闸门的法律AI产品制作P2.3.4本地Word测试稿。
 
 五个主体章节必须按以下顺序组织；证据不足时保留标题但缩短内容并说明边界：
 {json.dumps(REPORT_SECTION_HEADINGS, ensure_ascii=False)}
@@ -378,7 +503,7 @@ class EvidenceBoundReportDraftProvider:
             REPORT_SYSTEM_PROMPT,
             prompt,
             ReportDraft,
-            contract_name="模型返回内容不符合P2.3.3报告草稿契约",
+            contract_name="模型返回内容不符合P2.3.4报告草稿契约",
         )
         allowed_urls = {
             _normalize_url(item.url) for item in documents
@@ -405,7 +530,7 @@ class EvidenceBoundReportDraftProvider:
                 REPORT_SYSTEM_PROMPT,
                 repair_prompt,
                 ReportDraft,
-                contract_name="模型未完成P2.3.3主张—证据绑定修复",
+                contract_name="模型未完成P2.3.4主张—证据绑定修复",
             )
             remaining_gaps = _citation_gaps(draft, allowed_urls)
             if remaining_gaps:
@@ -414,9 +539,46 @@ class EvidenceBoundReportDraftProvider:
                     + "、".join(remaining_gaps)
                     + "），已停止生成Word"
                 )
+        audit, audit_failures = self._audit_citations(draft, documents, task)
+        if audit_failures:
+            audit_details = {
+                item.target_id: {"status": item.status, "reason": item.reason}
+                for item in audit.items
+                if item.target_id in audit_failures
+            }
+            relevance_repair_prompt = f"""证据相关性修复任务：上一版存在候选来源不能直接支持正文主张的问题。
+
+不通过目标：{json.dumps(audit_details, ensure_ascii=False, indent=2)}
+
+请重写这些目标，删除无证据事实或改为证据能够直接支持的有限表述，并重新填写真正支持该目标全部重要事实的source_urls。不得只替换URL而保留无证据主张；不得增加证据外的事实。其他部分保持紧凑。sources输出空数组。
+
+上一版草稿：
+{json.dumps(draft.model_dump(mode="json", exclude={"sources"}), ensure_ascii=False)}
+
+任务卡片与实际公开证据：
+{self._context(task, documents)}
+
+输出JSON必须符合以下Schema：
+{schema}
+"""
+            draft = generate_validated_json(
+                self.model,
+                REPORT_SYSTEM_PROMPT,
+                relevance_repair_prompt,
+                ReportDraft,
+                contract_name="模型未完成P2.3.4证据相关性修复",
+            )
+            audit, audit_failures = self._audit_citations(draft, documents, task)
+            if audit_failures:
+                raise ProviderInvalidResponse(
+                    "证据相关性复核仍未通过（"
+                    + "、".join(audit_failures)
+                    + "），已停止生成Word"
+                )
+        self._apply_audit_urls(draft, audit)
         product = task.canonical_product_name or task.submitted_product_name
         draft.report_title = f"{product}标杆分析报告"
-        draft.report_subtitle = "法律科技赛道 · P2.3.3主张—证据绑定测试稿"
+        draft.report_subtitle = "法律科技赛道 · P2.3.4证据相关性与冲突处理测试稿"
         draft.sections = draft.sections[:5]
         while len(draft.sections) < 5:
             draft.sections.append(
@@ -431,6 +593,9 @@ class EvidenceBoundReportDraftProvider:
             limitation = "本稿使用免费测试级公开检索，证据覆盖和稳定性不足以支持正式对外发布。"
             if limitation not in draft.limitations:
                 draft.limitations.append(limitation)
+        timeline_note = _timeline_conflict_note(documents)
+        if timeline_note and timeline_note not in draft.limitations:
+            draft.limitations.append(timeline_note)
         return self._enforce_evidence(draft, documents, task)
 
 
@@ -451,7 +616,7 @@ class FixtureReportDraftProvider:
         ]
         draft = ReportDraft(
             report_title=f"{product}标杆分析报告",
-            report_subtitle="法律科技赛道 · P2.3.3虚构测试稿",
+            report_subtitle="法律科技赛道 · P2.3.4虚构测试稿",
             executive_summary=["本报告仅用于自动化测试，不包含真实企业事实。"],
             sections=sections,
             insights=[
@@ -474,6 +639,7 @@ class FixtureReportDraftProvider:
             )
         ]
         draft.executive_summary_source_urls = [source_url]
+        draft.executive_summary_item_source_urls = [[source_url]]
         return draft
 
 
@@ -481,7 +647,7 @@ class UnavailableReportDraftProvider:
     ready = False
 
     def generate(self, task: Task) -> ReportDraft:
-        raise ProviderNotConfigured("当前身份适配器尚未实现P2.3.3报告生成")
+        raise ProviderNotConfigured("当前身份适配器尚未实现P2.3.4报告生成")
 
 
 def report_provider_from_identity(identity_provider) -> ReportDraftProvider:
