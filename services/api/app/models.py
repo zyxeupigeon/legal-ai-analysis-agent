@@ -23,6 +23,12 @@ class IdentityGate(StrEnum):
     REJECTED = "rejected"
 
 
+class ReportStatus(StrEnum):
+    NOT_STARTED = "not_started"
+    READY = "ready"
+    FAILED = "failed"
+
+
 class Candidate(BaseModel):
     id: str
     product_name: str
@@ -84,6 +90,44 @@ class IdentityResearchResult(BaseModel):
     summary: str
     limitations: list[str]
     web_search_used: bool = False
+
+
+class ReportSourceRecord(BaseModel):
+    url: str
+    title: str
+    retrieval_status: str
+
+
+class ReportSectionDraft(BaseModel):
+    heading: str
+    paragraphs: list[str] = Field(default_factory=list, max_length=5)
+    key_points: list[str] = Field(default_factory=list, max_length=6)
+    source_urls: list[str] = Field(default_factory=list)
+
+
+class ReportInsightDraft(BaseModel):
+    title: str
+    analysis: str
+    source_urls: list[str] = Field(default_factory=list)
+
+
+class ReportDraft(BaseModel):
+    report_title: str
+    report_subtitle: str
+    executive_summary: list[str] = Field(min_length=1, max_length=6)
+    sections: list[ReportSectionDraft] = Field(min_length=5, max_length=5)
+    insights: list[ReportInsightDraft] = Field(min_length=1, max_length=6)
+    limitations: list[str] = Field(default_factory=list, max_length=10)
+    sources: list[ReportSourceRecord] = Field(default_factory=list)
+
+
+class ReportArtifact(BaseModel):
+    task_id: str
+    report_status: ReportStatus
+    file_name: str
+    version: str
+    generated_at: datetime
+    download_url: str
 
 
 class TaskEvent(BaseModel):
@@ -149,6 +193,10 @@ class Task(BaseModel):
     storage_mode: str = "memory_only"
     classifier_mode: str = "openai_web_search"
     model_name: str | None = None
+    report_status: ReportStatus = ReportStatus.NOT_STARTED
+    report_file_name: str | None = None
+    report_version: str | None = None
+    report_generated_at: datetime | None = None
 
 
 class HealthResponse(BaseModel):
