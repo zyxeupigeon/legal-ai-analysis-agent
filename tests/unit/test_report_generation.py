@@ -4,7 +4,9 @@ import pytest
 from docx import Document
 
 from services.api.app.models import (
+    EvidenceSource,
     IdentityGate,
+    RelatedProduct,
     ReportDraft,
     ReportInsightDraft,
     ReportSectionDraft,
@@ -158,6 +160,53 @@ def test_report_provider_normalizes_short_section_list_without_inventing_facts()
     assert [source.url for source in draft.sources] == ["https://actual.example/product"]
 
 
+def test_identity_evidence_is_inherited_for_ecosystem_table() -> None:
+    task = fixture_task()
+    identity_url = "https://official.example/open-api"
+    task.sources = [
+        EvidenceSource(
+            url=identity_url,
+            title="开放平台官方文档",
+            source_type="official_docs",
+            supports=["ecosystem", "api"],
+        )
+    ]
+    task.related_products = [
+        RelatedProduct(
+            name="衡法开放API",
+            kind="api",
+            relationship="向同企业产品提供接口能力。",
+            verification_status="confirmed",
+            source_urls=[identity_url],
+        )
+    ]
+    provider = EvidenceBoundReportDraftProvider(
+        FakeModel(report_payload(["https://actual.example/product"])),
+        FakeSearch(),
+    )
+
+    draft = provider.generate(task)
+
+    inherited = next(source for source in draft.sources if source.url == identity_url)
+    assert inherited.inherited_from_identity is True
+    assert inherited.evidence_level == "official_primary"
+    assert inherited.accessed_at is not None
+
+
+def test_unsupported_strong_conclusions_are_downgraded() -> None:
+    payload = report_payload(["https://actual.example/product"])
+    payload["sections"][0]["paragraphs"] = ["该产品已形成壁垒，并形成成熟的变现路径。"]
+    payload["insights"][0]["analysis"] = "其行业领先地位和B端付费意愿已经得到证明。"
+    provider = EvidenceBoundReportDraftProvider(FakeModel(payload), FakeSearch())
+
+    draft = provider.generate(fixture_task())
+
+    combined = " ".join(draft.sections[0].paragraphs + [draft.insights[0].analysis])
+    assert "已形成壁垒" not in combined
+    assert "成熟的变现路径" not in combined
+    assert "行业领先" not in combined
+
+
 def test_word_builder_creates_editable_document(tmp_path) -> None:
     task = fixture_task()
     draft = FixtureReportDraftProvider().generate(task)
@@ -171,3 +220,27 @@ def test_word_builder_creates_editable_document(tmp_path) -> None:
     assert "衡法智研标杆分析报告" in text
     assert all(heading in text for heading in REPORT_SECTION_HEADINGS)
     assert "主要数据来源一览" in text
+    assert "本节证据：[1]" in text
+    assert "[1] 虚构自动化测试来源" in text
+
+
+def test_word_builder_downgrades_unmapped_confirmed_ecosystem_item(tmp_path) -> None:
+    task = fixture_task()
+    task.related_products = [
+        RelatedProduct(
+            name="无来源API",
+            kind="api",
+            relationship="模型声称存在关联。",
+            verification_status="confirmed",
+            source_urls=["https://not-in-ledger.example/api"],
+        )
+    ]
+    draft = FixtureReportDraftProvider().generate(task)
+    output = tmp_path / "unmapped.docx"
+
+    build_report_docx(draft, task, output)
+    document = Document(output)
+    table_text = "\n".join(cell.text for table in document.tables for row in table.rows for cell in row.cells)
+
+    assert "仅发现公开线索" in table_text
+    assert "已由公开来源确认" not in table_text
