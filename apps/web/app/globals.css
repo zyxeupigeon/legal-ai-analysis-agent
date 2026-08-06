@@ -37,6 +37,7 @@ main { width: min(1120px, calc(100% - 36px)); margin: 0 auto; padding: 52px 0 36
 .phase-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
 .phase { border: 1px solid var(--green); border-radius: 999px; padding: 8px 12px; color: var(--green); font-size: .78rem; font-weight: 700; }
 .phase.active:first-child { color: #fff; background: var(--green); }
+.phase.active:last-child { color: #fff; background: var(--green); }
 .phase.muted { color: #8e9692; border-color: #c8cbc6; }
 
 .workspace-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(280px, .7fr); gap: 18px; }
@@ -103,6 +104,12 @@ button:hover:not(:disabled) { background: var(--green-dark); }
 .sources small { display: block; margin-top: 2px; color: var(--muted); }
 .phase-limit { display: flex; flex-direction: column; gap: 4px; margin-top: 20px; border-left: 3px solid var(--green); padding: 11px 14px; background: #eef4ef; font-size: .82rem; }
 .phase-limit span { color: var(--muted); }
+.report-action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 22px; align-items: center; margin-top: 22px; border: 1px solid #bfd0c5; padding: 20px; background: #f1f7f3; }
+.report-action h3 { margin: 7px 0 6px; font-family: Georgia, "Songti SC", serif; font-size: 1.25rem; }
+.report-action p { max-width: 660px; font-size: .82rem; line-height: 1.55; }
+.report-action small { grid-column: 1 / -1; color: var(--muted); overflow-wrap: anywhere; }
+.download-button { display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; padding: 13px 19px; color: #fff; background: var(--green); font-weight: 800; text-decoration: none; }
+.download-button:hover { background: var(--green-dark); }
 .task-id { margin-top: 20px !important; font-family: ui-monospace, monospace; font-size: .68rem; }
 
 .history { margin-top: 44px; }
@@ -124,6 +131,7 @@ footer { margin-top: 55px; border-top: 1px solid var(--line); padding-top: 20px;
   .input-panel, .scope-panel, .result-panel { padding: 22px; }
   .input-row, .confirm-row { flex-direction: column; }
   .candidate-grid, .facts, .related-grid { grid-template-columns: 1fr; }
+  .report-action { grid-template-columns: 1fr; }
   .facts div { border-right: 0; border-bottom: 1px solid var(--line); }
   .facts div:last-child { border-bottom: 0; }
 }
