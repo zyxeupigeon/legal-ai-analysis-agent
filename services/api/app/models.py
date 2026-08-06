@@ -102,6 +102,16 @@ class ReportSourceRecord(BaseModel):
     url: str
     title: str
     retrieval_status: str
+    source_type: str = "other"
+    evidence_level: Literal[
+        "government_record",
+        "official_primary",
+        "independent_secondary",
+        "other_public",
+        "test_fixture",
+    ] = "other_public"
+    accessed_at: str | None = None
+    inherited_from_identity: bool = False
 
 
 class ReportSectionDraft(BaseModel):
@@ -121,6 +131,7 @@ class ReportDraft(BaseModel):
     report_title: str = ""
     report_subtitle: str = ""
     executive_summary: list[ReportSummary] = Field(min_length=1, max_length=3)
+    executive_summary_source_urls: list[str] = Field(default_factory=list)
     sections: list[ReportSectionDraft] = Field(min_length=1, max_length=7)
     insights: list[ReportInsightDraft] = Field(min_length=1, max_length=3)
     limitations: list[str] = Field(default_factory=list, max_length=10)
