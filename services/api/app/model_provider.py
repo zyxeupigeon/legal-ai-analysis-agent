@@ -107,8 +107,25 @@ class OpenAICompatibleJSONModel:
             "stream": False,
             "max_tokens": self.settings.max_tokens,
         }
+        if self.provider_name == "deepseek":
+            # DeepSeek V4 defaults to thinking mode. For strict JSON extraction,
+            # disabling it avoids spending the completion budget on reasoning
+            # while leaving the final content empty.
+            body["thinking"] = {"type": "disabled"}
         last_empty = False
-        for _attempt in range(self.settings.max_retries + 1):
+        for attempt in range(self.settings.max_retries + 1):
+            request_body = dict(body)
+            if attempt:
+                request_body["messages"] = [
+                    *body["messages"],
+                    {
+                        "role": "user",
+                        "content": (
+                            "上次响应正文为空。请不要输出解释或思考过程，"
+                            "立即按照既定Schema输出一个完整JSON对象。"
+                        ),
+                    },
+                ]
             try:
                 with httpx.Client(
                     base_url=self.settings.base_url,
@@ -121,7 +138,7 @@ class OpenAICompatibleJSONModel:
                             "Authorization": f"Bearer {self.settings.api_key}",
                             "Content-Type": "application/json",
                         },
-                        json=body,
+                        json=request_body,
                     )
                     response.raise_for_status()
                     payload = response.json()
