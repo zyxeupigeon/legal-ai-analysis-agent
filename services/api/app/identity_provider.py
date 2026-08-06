@@ -14,6 +14,7 @@ from .model_provider import (
     ChatCompletionsSettings,
     OpenAICompatibleJSONModel,
     StructuredModelProvider,
+    generate_validated_json,
 )
 from .models import (
     Candidate,
@@ -568,8 +569,17 @@ class ExternalSearchIdentityProvider:
 请输出一个JSON对象，必须完整符合以下JSON Schema，不要输出Markdown或额外说明：
 {schema_text}
 """
-        output_text = self.model.generate_json(IDENTITY_SYSTEM_PROMPT, user_prompt)
-        return _parse_external_result(output_text, documents)
+        result = generate_validated_json(
+            self.model,
+            IDENTITY_SYSTEM_PROMPT,
+            user_prompt,
+            IdentityResearchResult,
+            contract_name="模型返回结果不符合P2.2.2身份研究契约",
+        )
+        result.web_search_used = True
+        allowed_urls = {_normalize_url(document.url) for document in documents}
+        _apply_evidence_rules(result, allowed_urls)
+        return _normalize_result(result)
 
     def research(
         self,

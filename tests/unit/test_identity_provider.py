@@ -295,6 +295,31 @@ def test_external_search_stops_before_ecosystem_when_identity_is_ambiguous() -> 
     assert result.related_products == []
 
 
+def test_external_search_repairs_invalid_identity_contract_once() -> None:
+    ambiguous = _clear_result()
+    ambiguous.update(
+        {
+            "outcome": "ambiguous",
+            "canonical_product_name": None,
+            "operator_name": None,
+            "product_type": None,
+            "is_legal_ai": None,
+            "clarification_question": "请确认具体产品。",
+            "candidates": [],
+            "related_products": [],
+        }
+    )
+    model = _SequenceModel([{"outcome": "ambiguous"}, ambiguous])
+    search = _RecordedSearch()
+
+    result = ExternalSearchIdentityProvider(model, search).research("公开助手")
+
+    assert result.outcome == "ambiguous"
+    assert len(model.prompts) == 2
+    assert "格式修复任务" in model.prompts[1]
+    assert "不得增加公开证据中没有的事实" in model.prompts[1]
+
+
 def test_external_search_continues_query_plan_after_irrelevant_results() -> None:
     ambiguous = _clear_result()
     ambiguous.update(

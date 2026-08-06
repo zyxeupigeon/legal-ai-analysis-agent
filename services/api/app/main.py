@@ -23,7 +23,7 @@ from .service import (
 from .store import InMemoryTaskStore
 
 
-APP_VERSION = "0.3.1"
+APP_VERSION = "0.3.2"
 
 
 def create_app(

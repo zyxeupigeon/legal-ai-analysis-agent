@@ -23,8 +23,8 @@ frozen_files:
   task_boundary_docx_sha256: "aacb93d6ff99c551bbe11fa8258f89eacf3858f106b447d85478d8f43a29379d"
 
 implementation:
-  app_version: "0.3.1"
-  api_contract_version: "0.3.1"
+  app_version: "0.3.2"
+  api_contract_version: "0.3.2"
   event_contract_version: "0.1.0"
   database_schema_version: "not_started"
   report_template_version: "0.1-p2.3.1-test"

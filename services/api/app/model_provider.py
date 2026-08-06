@@ -3,9 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import os
-from typing import Protocol
+from typing import Protocol, TypeVar
 
 import httpx
+from pydantic import BaseModel, ValidationError
 
 from .provider_errors import ProviderInvalidResponse, ProviderNotConfigured, ProviderUnavailable
 
@@ -21,6 +22,43 @@ class StructuredModelProvider(Protocol):
     def readiness_message(self) -> str: ...
 
     def generate_json(self, system_prompt: str, user_prompt: str) -> str: ...
+
+
+StructuredResult = TypeVar("StructuredResult", bound=BaseModel)
+
+
+def generate_validated_json(
+    model: StructuredModelProvider,
+    system_prompt: str,
+    user_prompt: str,
+    output_type: type[StructuredResult],
+    *,
+    contract_name: str,
+) -> StructuredResult:
+    """Validate structured output and make one evidence-preserving repair attempt."""
+    active_prompt = user_prompt
+    for attempt in range(2):
+        output_text = model.generate_json(system_prompt, active_prompt)
+        try:
+            return output_type.model_validate(json.loads(output_text))
+        except (json.JSONDecodeError, ValidationError) as exc:
+            if attempt:
+                raise ProviderInvalidResponse(
+                    f"{contract_name}；已自动修复重试，但仍无法形成可用结果"
+                ) from exc
+            detail = (
+                json.dumps(exc.errors(include_url=False), ensure_ascii=False)[:2400]
+                if isinstance(exc, ValidationError)
+                else str(exc)[:2400]
+            )
+            active_prompt = f"""{user_prompt}
+
+格式修复任务：上一次输出未通过程序校验。只能修复JSON语法、缺失字段、字段类型、枚举值和层级；不得增加公开证据中没有的事实、主体、产品、功能或URL。不要解释，直接重新输出完整JSON对象。
+校验错误：{detail}
+上一次输出：
+{output_text[:12000]}
+"""
+    raise ProviderInvalidResponse(contract_name)
 
 
 @dataclass(frozen=True)

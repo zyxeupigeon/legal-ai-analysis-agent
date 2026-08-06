@@ -36,6 +36,16 @@ class FakeModel:
         return json.dumps(self.payload, ensure_ascii=False)
 
 
+class SequenceModel(FakeModel):
+    def __init__(self, payloads: list[dict]) -> None:
+        self.payloads = list(payloads)
+        self.prompts: list[str] = []
+
+    def generate_json(self, system_prompt: str, user_prompt: str) -> str:
+        self.prompts.append(user_prompt)
+        return json.dumps(self.payloads.pop(0), ensure_ascii=False)
+
+
 class FakeSearch:
     ready = True
     provider_name = "fixture-search"
@@ -117,6 +127,22 @@ def test_report_provider_rejects_draft_without_real_citation() -> None:
     )
     with pytest.raises(ProviderInvalidResponse, match="没有引用任何实际检索来源"):
         provider.generate(fixture_task())
+
+
+def test_report_provider_repairs_invalid_contract_once() -> None:
+    model = SequenceModel(
+        [
+            {"report_title": "缺少字段"},
+            report_payload(["https://actual.example/product"]),
+        ]
+    )
+    provider = EvidenceBoundReportDraftProvider(model, FakeSearch())
+
+    draft = provider.generate(fixture_task())
+
+    assert len(draft.sections) == 5
+    assert len(model.prompts) == 2
+    assert "格式修复任务" in model.prompts[1]
 
 
 def test_word_builder_creates_editable_document(tmp_path) -> None:
