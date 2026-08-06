@@ -165,7 +165,7 @@ def _safe_file_component(value: str) -> str:
 
 def report_file_name(task: Task, generated_on: date) -> str:
     product = _safe_file_component(task.canonical_product_name or task.submitted_product_name)
-    return f"{product}标杆分析报告_法律科技赛道.V0.3.P2.3.3测试稿.{generated_on:%Y%m%d}.docx"
+    return f"{product}标杆分析报告_法律科技赛道.V0.4.P2.3.4测试稿.{generated_on:%Y%m%d}.docx"
 
 
 def _source_reference_text(urls: list[str], source_numbers: dict[str, int]) -> str:
@@ -201,7 +201,7 @@ def build_report_docx(
 
     header = section.header.paragraphs[0]
     header.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    run = header.add_run("法律 AI 产品标杆分析 | P2.3.3 主张—证据绑定测试稿")
+    run = header.add_run("法律 AI 产品标杆分析 | P2.3.4 证据相关性审计测试稿")
     _set_run_font(run, size=9, color=MUTED)
     _add_page_number(section.footer.paragraphs[0])
 
@@ -237,20 +237,24 @@ def build_report_docx(
         _set_run_font(run, size=10.5, color=MUTED)
     document.add_page_break()
 
-    document.add_heading("报告摘要", level=1)
-    for paragraph in draft.executive_summary:
-        document.add_paragraph(paragraph)
-
     source_numbers = {
         source.url.split("#", 1)[0].rstrip("/"): index
         for index, source in enumerate(draft.sources, start=1)
     }
 
-    summary_references = _source_reference_text(draft.executive_summary_source_urls, source_numbers)
-    if summary_references:
-        source_p = document.add_paragraph()
-        run = source_p.add_run(f"摘要证据：{summary_references}")
-        _set_run_font(run, size=8.5, color=MUTED)
+    document.add_heading("报告摘要", level=1)
+    for index, paragraph in enumerate(draft.executive_summary):
+        summary_p = document.add_paragraph()
+        summary_p.add_run(paragraph)
+        item_urls = (
+            draft.executive_summary_item_source_urls[index]
+            if index < len(draft.executive_summary_item_source_urls)
+            else draft.executive_summary_source_urls
+        )
+        summary_references = _source_reference_text(item_urls, source_numbers)
+        if summary_references:
+            run = summary_p.add_run(f"  {summary_references}")
+            _set_run_font(run, size=8.5, color=MUTED)
 
     scope_note = document.add_paragraph()
     scope_run = scope_note.add_run(
@@ -336,7 +340,7 @@ def build_report_docx(
         _set_run_font(run, size=9.5)
 
     document.core_properties.title = draft.report_title
-    document.core_properties.subject = "法律AI产品标杆分析P2.3.3主张—证据绑定测试稿"
+    document.core_properties.subject = "法律AI产品标杆分析P2.3.4证据相关性审计测试稿"
     document.core_properties.author = "法律AI分析Agent"
     document.core_properties.comments = "本地生成；不含数据库写入或训练。"
     document.save(output_path)
