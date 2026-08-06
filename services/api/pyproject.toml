@@ -1,6 +1,6 @@
 [project]
 name = "legal-ai-analysis-agent-api"
-version = "0.3.0"
+version = "0.3.1"
 description = "P2.3.1 local legal AI evidence-bound Word report test build"
 requires-python = ">=3.12"
 dependencies = [
