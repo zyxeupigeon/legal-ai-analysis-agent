@@ -44,14 +44,17 @@ def test_openai_compatible_model_uses_json_chat_completions_contract() -> None:
     assert captured["body"]["response_format"] == {"type": "json_object"}
     assert captured["body"]["model"] == "deepseek-v4-flash"
     assert captured["body"]["stream"] is False
+    assert captured["body"]["thinking"] == {"type": "disabled"}
 
 
 def test_model_retries_one_empty_json_response() -> None:
     calls = 0
+    bodies = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal calls
         calls += 1
+        bodies.append(json.loads(request.content))
         content = "" if calls == 1 else '{"ok":true}'
         return httpx.Response(200, json={"choices": [{"message": {"content": content}}]})
 
@@ -69,6 +72,9 @@ def test_model_retries_one_empty_json_response() -> None:
 
     assert json.loads(model.generate_json("JSON", "测试"))["ok"] is True
     assert calls == 2
+    assert len(bodies[0]["messages"]) == 2
+    assert len(bodies[1]["messages"]) == 3
+    assert "上次响应正文为空" in bodies[1]["messages"][-1]["content"]
 
 
 def test_tavily_search_adapter_returns_only_http_documents() -> None:
