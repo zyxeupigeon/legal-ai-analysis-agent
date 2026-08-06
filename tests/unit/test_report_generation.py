@@ -145,6 +145,19 @@ def test_report_provider_repairs_invalid_contract_once() -> None:
     assert "格式修复任务" in model.prompts[1]
 
 
+def test_report_provider_normalizes_short_section_list_without_inventing_facts() -> None:
+    payload = report_payload(["https://actual.example/product"])
+    payload["sections"] = payload["sections"][:3]
+    payload["sources"] = [{"unexpected": "model ledger is ignored"}]
+    provider = EvidenceBoundReportDraftProvider(FakeModel(payload), FakeSearch())
+
+    draft = provider.generate(fixture_task())
+
+    assert len(draft.sections) == 5
+    assert draft.sections[3].paragraphs == ["当前公开证据不足以形成可靠结论。"]
+    assert [source.url for source in draft.sources] == ["https://actual.example/product"]
+
+
 def test_word_builder_creates_editable_document(tmp_path) -> None:
     task = fixture_task()
     draft = FixtureReportDraftProvider().generate(task)
