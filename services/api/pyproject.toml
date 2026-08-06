@@ -1,11 +1,12 @@
 [project]
 name = "legal-ai-analysis-agent-api"
-version = "0.2.3"
-description = "P2.2.2 mainland-friendly legal AI identity research test build"
+version = "0.3.0"
+description = "P2.3.1 local legal AI evidence-bound Word report test build"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi==0.141.1",
   "httpx==0.28.1",
+  "python-docx==1.2.0",
   "uvicorn[standard]==0.52.1",
 ]
 
