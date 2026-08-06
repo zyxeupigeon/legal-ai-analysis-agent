@@ -26,7 +26,7 @@ def test_health_declares_explicit_fixture_mode() -> None:
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "app_version": "0.5.0",
+        "app_version": "0.6.0",
         "storage_mode": "memory_only",
         "classifier_mode": "deterministic_fixture",
         "provider_ready": True,
