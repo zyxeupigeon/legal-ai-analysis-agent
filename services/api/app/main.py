@@ -1,35 +1,50 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from .identity_provider import (
     IdentityResearchProvider,
     provider_from_env,
 )
-from .models import ClarificationCreate, HealthResponse, Task, TaskCreate
+from .models import ClarificationCreate, HealthResponse, ReportArtifact, Task, TaskCreate
 from .provider_errors import ProviderInvalidResponse, ProviderNotConfigured, ProviderUnavailable
-from .service import ClarificationError, TaskNotFound, TaskService
+from .report_provider import ReportDraftProvider
+from .service import (
+    ClarificationError,
+    ReportGenerationError,
+    TaskNotFound,
+    TaskService,
+)
 from .store import InMemoryTaskStore
 
 
-APP_VERSION = "0.2.3"
+APP_VERSION = "0.3.0"
 
 
 def create_app(
     provider: IdentityResearchProvider | None = None,
     task_store: InMemoryTaskStore | None = None,
+    report_provider: ReportDraftProvider | None = None,
+    artifact_root: Path | None = None,
 ) -> FastAPI:
     active_provider = provider or provider_from_env()
     active_store = task_store or InMemoryTaskStore()
-    service = TaskService(active_store, active_provider)
+    service = TaskService(
+        active_store,
+        active_provider,
+        report_provider=report_provider,
+        artifact_root=artifact_root,
+    )
 
     application = FastAPI(
         title="法律AI分析Agent API",
         version=APP_VERSION,
-        description="P2.2.2大陆可用测试版身份闸门与公开信息检索；不建库、不生成报告、不训练。",
+        description="P2.3.1本地法律AI身份核验、证据约束报告草稿与Word导出；不建库、不训练。",
     )
     application.state.task_store = active_store
     application.state.identity_provider = active_provider
@@ -96,6 +111,33 @@ def create_app(
             raise HTTPException(status_code=404, detail="任务不存在") from exc
         except ClarificationError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @application.post(
+        "/api/tasks/{task_id}/reports",
+        response_model=ReportArtifact,
+        status_code=status.HTTP_201_CREATED,
+    )
+    def generate_report(task_id: str) -> ReportArtifact:
+        try:
+            return execute(lambda: service.generate_report(task_id))
+        except TaskNotFound as exc:
+            raise HTTPException(status_code=404, detail="任务不存在") from exc
+        except ReportGenerationError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @application.get("/api/tasks/{task_id}/reports/latest/download")
+    def download_latest_report(task_id: str):
+        try:
+            task, path = service.latest_report_path(task_id)
+        except TaskNotFound as exc:
+            raise HTTPException(status_code=404, detail="任务不存在") from exc
+        except ReportGenerationError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return FileResponse(
+            path,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            filename=task.report_file_name,
+        )
 
     return application
 

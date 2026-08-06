@@ -1,11 +1,22 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
 from .identity_gate import candidate_by_id
 from .identity_provider import IdentityResearchProvider
-from .models import ClarificationCreate, IdentityGate, IdentityResearchResult, Task, TaskStatus
+from .models import (
+    ClarificationCreate,
+    IdentityGate,
+    IdentityResearchResult,
+    ReportArtifact,
+    ReportStatus,
+    Task,
+    TaskStatus,
+)
+from .report_document import build_report_docx, report_file_name
+from .report_provider import ReportDraftProvider, report_provider_from_identity
 from .state_machine import transition
 from .store import InMemoryTaskStore
 
@@ -18,10 +29,23 @@ class ClarificationError(ValueError):
     pass
 
 
+class ReportGenerationError(ValueError):
+    pass
+
+
 class TaskService:
-    def __init__(self, store: InMemoryTaskStore, provider: IdentityResearchProvider) -> None:
+    def __init__(
+        self,
+        store: InMemoryTaskStore,
+        provider: IdentityResearchProvider,
+        *,
+        report_provider: ReportDraftProvider | None = None,
+        artifact_root: Path | None = None,
+    ) -> None:
         self.store = store
         self.provider = provider
+        self.report_provider = report_provider or report_provider_from_identity(provider)
+        self.artifact_root = artifact_root or Path("artifacts/local")
 
     def create(self, product_name: str) -> Task:
         now = datetime.now(UTC)
@@ -70,6 +94,56 @@ class TaskService:
         self._apply_result(task, result, clarification_round=True)
         return self.store.save(task)
 
+    def generate_report(self, task_id: str) -> ReportArtifact:
+        task = self.store.get(task_id)
+        if not task:
+            raise TaskNotFound(task_id)
+        if IdentityGate(task.identity_gate) is not IdentityGate.CONFIRMED:
+            raise ReportGenerationError("只有通过身份闸门的法律AI产品才能生成报告")
+        try:
+            draft = self.report_provider.generate(task)
+            generated_at = datetime.now(UTC)
+            file_name = report_file_name(task, generated_at.date())
+            output_path = self.report_path(task.task_id, file_name)
+            build_report_docx(draft, task, output_path, generated_on=generated_at.date())
+        except Exception:
+            task.report_status = ReportStatus.FAILED
+            task.status_message = "报告研究或Word生成失败，未产生可下载文件。"
+            task.updated_at = datetime.now(UTC)
+            self.store.save(task)
+            raise
+        task.report_status = ReportStatus.READY
+        task.report_file_name = file_name
+        task.report_version = "0.1-p2.3.1-test"
+        task.report_generated_at = generated_at
+        task.phase_limit_reached = True
+        task.status_message = "已生成证据约束的P2.3.1本地Word测试稿。"
+        task.next_action = "请下载并人工检查内容质量；当前仍不建库、不部署、不训练。"
+        task.updated_at = generated_at
+        self.store.save(task)
+        return ReportArtifact(
+            task_id=task.task_id,
+            report_status=ReportStatus.READY,
+            file_name=file_name,
+            version=task.report_version,
+            generated_at=generated_at,
+            download_url=f"/api/tasks/{task.task_id}/reports/latest/download",
+        )
+
+    def latest_report_path(self, task_id: str) -> tuple[Task, Path]:
+        task = self.store.get(task_id)
+        if not task:
+            raise TaskNotFound(task_id)
+        if ReportStatus(task.report_status) is not ReportStatus.READY or not task.report_file_name:
+            raise ReportGenerationError("当前任务还没有可下载的Word报告")
+        path = self.report_path(task.task_id, task.report_file_name)
+        if not path.is_file():
+            raise ReportGenerationError("本地报告文件不存在，可能已被移动或清理")
+        return task, path
+
+    def report_path(self, task_id: str, file_name: str) -> Path:
+        return self.artifact_root / task_id / file_name
+
     def _apply_result(
         self,
         task: Task,
@@ -115,8 +189,8 @@ class TaskService:
         task.candidates = []
         task.clarification_question = None
         task.status_message = "身份、运营主体与法律AI边界已完成公开核验；相关AI产品/API/MCP线索已识别。"
-        task.next_action = "P2.2.2在正式报告生成前暂停。"
-        task.phase_limit_reached = True
+        task.next_action = "可以生成P2.3.1本地Word测试稿。"
+        task.phase_limit_reached = False
         transition(task, TaskStatus.RESEARCHING, reason)
 
     @staticmethod

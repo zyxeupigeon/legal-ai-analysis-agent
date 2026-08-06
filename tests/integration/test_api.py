@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from services.api.app.identity_provider import FixtureIdentityResearchProvider
 from services.api.app.identity_provider import OpenAIProviderSettings, OpenAIResponsesIdentityProvider
 from services.api.app.main import create_app
+from services.api.app.report_provider import FixtureReportDraftProvider
 from services.api.app.store import InMemoryTaskStore
 
 
@@ -25,7 +26,7 @@ def test_health_declares_explicit_fixture_mode() -> None:
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "app_version": "0.2.3",
+        "app_version": "0.3.0",
         "storage_mode": "memory_only",
         "classifier_mode": "deterministic_fixture",
         "provider_ready": True,
@@ -37,13 +38,14 @@ def test_health_declares_explicit_fixture_mode() -> None:
     }
 
 
-def test_clear_product_reaches_p2_phase_limit() -> None:
+def test_clear_product_can_enter_report_generation() -> None:
     response = create("衡法智研")
     assert response.status_code == 201
     task = response.json()
     assert task["task_status"] == "研究中"
     assert task["identity_gate"] == "confirmed"
-    assert task["phase_limit_reached"] is True
+    assert task["phase_limit_reached"] is False
+    assert task["report_status"] == "not_started"
     assert len(task["related_product_hints"]) == 2
     assert len(task["events"]) == 1
 
@@ -104,6 +106,42 @@ def test_out_of_scope_product_terminates_without_report_work() -> None:
     assert task["identity_gate"] == "rejected"
     assert task["next_action"] is None
     assert task["related_product_hints"] == []
+
+
+def test_confirmed_product_generates_and_downloads_word(tmp_path) -> None:
+    isolated_store = InMemoryTaskStore()
+    isolated_client = TestClient(
+        create_app(
+            FixtureIdentityResearchProvider(),
+            isolated_store,
+            report_provider=FixtureReportDraftProvider(),
+            artifact_root=tmp_path,
+        )
+    )
+    task = isolated_client.post("/api/tasks", json={"product_name": "衡法智研"}).json()
+
+    generated = isolated_client.post(f"/api/tasks/{task['task_id']}/reports")
+    assert generated.status_code == 201
+    artifact = generated.json()
+    assert artifact["report_status"] == "ready"
+    assert artifact["file_name"].endswith(".docx")
+
+    updated = isolated_client.get(f"/api/tasks/{task['task_id']}").json()
+    assert updated["phase_limit_reached"] is True
+    assert updated["report_status"] == "ready"
+
+    downloaded = isolated_client.get(artifact["download_url"])
+    assert downloaded.status_code == 200
+    assert downloaded.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    assert downloaded.content.startswith(b"PK")
+
+
+def test_unconfirmed_product_cannot_generate_report() -> None:
+    task = create("星云助手").json()
+    response = client.post(f"/api/tasks/{task['task_id']}/reports")
+    assert response.status_code == 409
 
 
 def test_empty_name_is_rejected() -> None:
