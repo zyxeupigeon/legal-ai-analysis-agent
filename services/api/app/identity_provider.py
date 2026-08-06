@@ -191,7 +191,7 @@ RESEARCH_JSON_SCHEMA: dict[str, Any] = {
 }
 
 
-IDENTITY_SYSTEM_PROMPT = """你是法律AI产品身份研究Agent，只执行P2.2.2身份辨析与同企业AI生态线索识别。
+IDENTITY_SYSTEM_PROMPT = """你是法律AI产品身份研究Agent，只执行P2.3.4身份辨析与同企业AI生态线索识别。
 
 必须遵守：
 1. 只使用公开网页检索所得信息；优先级为政府/监管、产品官网与官方文档、官方条款和运营主体官网，再到可靠行业与媒体来源。
@@ -438,7 +438,7 @@ class OpenAIResponsesIdentityProvider:
         try:
             result = IdentityResearchResult.model_validate(json.loads(output_text))
         except (json.JSONDecodeError, ValidationError) as exc:
-            raise ProviderInvalidResponse("Agent返回结果不符合P2.2.2身份研究契约") from exc
+            raise ProviderInvalidResponse("Agent返回结果不符合P2.3.4身份研究契约") from exc
         result.web_search_used = web_search_used
         _merge_citation_annotations(result, annotations)
         _enforce_search_evidence(result, annotations, search_sources)
@@ -477,7 +477,7 @@ def _parse_external_result(output_text: str, documents: list[SearchDocument]) ->
     try:
         result = IdentityResearchResult.model_validate(json.loads(output_text))
     except (json.JSONDecodeError, ValidationError) as exc:
-        raise ProviderInvalidResponse("模型返回结果不符合P2.2.2身份研究契约") from exc
+        raise ProviderInvalidResponse("模型返回结果不符合P2.3.4身份研究契约") from exc
     result.web_search_used = True
     allowed_urls = {_normalize_url(document.url) for document in documents}
     _apply_evidence_rules(result, allowed_urls)
@@ -554,7 +554,7 @@ class ExternalSearchIdentityProvider:
         stage_instruction = (
             "本轮只完成身份、运营主体和法律AI范围核验。无论结果如何，related_products必须为空。"
             if stage == "identity"
-            else "身份初步通过。本轮复核身份，并识别同一运营主体的AI产品、API、MCP及其他技术入口。"
+            else "身份初步通过。本轮复核身份，并分别识别同一运营主体的AI产品、API、MCP、插件、连接器、Skill及其他技术入口。"
         )
         user_prompt = f"""待辨析产品：{product_name}
 用户是否确认过候选：{'是' if confirmed_by_user else '否'}
@@ -574,7 +574,7 @@ class ExternalSearchIdentityProvider:
             IDENTITY_SYSTEM_PROMPT,
             user_prompt,
             IdentityResearchResult,
-            contract_name="模型返回结果不符合P2.2.2身份研究契约",
+            contract_name="模型返回结果不符合P2.3.4身份研究契约",
         )
         result.web_search_used = True
         allowed_urls = {_normalize_url(document.url) for document in documents}
@@ -612,6 +612,7 @@ class ExternalSearchIdentityProvider:
             [
                 f'"{identity_result.operator_name}" AI 产品 API 开放平台 官方',
                 f'"{identity_result.operator_name}" MCP 官方 文档',
+                f'"{identity_result.operator_name}" Skill 插件 连接器 智能体 官方',
             ]
         )
         all_documents = _dedupe_documents(identity_documents + ecosystem_documents)
