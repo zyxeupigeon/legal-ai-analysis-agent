@@ -1,0 +1,13 @@
+{
+  "profile_id": "p3-delifasou-regression-0.1",
+  "product_name": "得理法搜",
+  "required_report_label": "P3.0端到端测试稿",
+  "minimum_source_urls": 6,
+  "required_source_domains": [
+    "fgw.sz.gov.cn"
+  ],
+  "required_evidence_patterns": [
+    "历经.{0,3}6.{0,3}年",
+    "历时.{0,3}8.{0,3}年"
+  ]
+}

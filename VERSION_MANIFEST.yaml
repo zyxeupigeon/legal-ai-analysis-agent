@@ -1,5 +1,5 @@
 manifest_version: "1.1"
-project_phase: "P2.3.4"
+project_phase: "P3.0"
 repository_visibility: "private"
 repository_owner_type: "personal"
 
@@ -29,6 +29,7 @@ implementation:
   database_schema_version: "not_started"
   report_template_version: "0.4-p2.3.4-test"
   evaluation_set_version: "0.1.0"
+  portable_agent_protocol_version: "0.1.0"
 
 data_policy:
   test_data: "public_or_irreversibly_desensitized_only"
@@ -57,3 +58,15 @@ p2_3_4_guards:
   local_test_report_generation_allowed: true
   formal_report_publication_allowed: false
   training_allowed: false
+portable_agent:
+  mode: "user_selected_cli_agent"
+  required_specific_agent: false
+  required_specific_model: false
+  required_project_model_api: false
+  required_specific_mcp: false
+  canonical_protocol: "PROJECT_AGENT_PROTOCOL.md"
+  isolated_output_directory: "agent_outputs"
+  validated_hosts:
+    - "opencode_1.18.15_deepseek"
+    - "claude_code_2.1.226_deepseek"
+  end_to_end_report_validation: "failed_pending_evidence_and_layout_fix"
