@@ -196,6 +196,7 @@ class EvidenceBoundReportDraftProvider:
         queries = [
             f'"{operator}" 联合实验室 site:ac.cn',
             f'"{product}" 历经 年 研发',
+            f'"{product}" site:gov.cn',
             f'"{operator}" 研发 年限 site:gov.cn',
             f'"{operator}" 开放平台 API Skill 插件 连接器 MCP',
             f'"{product}" "{operator}" 备案 site:cac.gov.cn',

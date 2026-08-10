@@ -603,6 +603,7 @@ def test_report_search_plan_targets_public_duration_conflicts() -> None:
     provider._collect_documents(fixture_task())
 
     assert any("历经 年 研发" in query for query in search.queries)
+    assert any('"衡法智研" site:gov.cn' in query for query in search.queries)
     assert any("研发 年限 site:gov.cn" in query for query in search.queries)
 
 
