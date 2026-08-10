@@ -126,10 +126,22 @@ def _moderate_claim_strength(text: str) -> str:
 def _moderate_regulatory_claim(text: str, *, has_regulatory_source: bool) -> str:
     if has_regulatory_source:
         return text
-    claim_pattern = re.compile(r"(?:首批.{0,12})?(?:通过|完成).{0,12}(?:网信办|备案)|首批.{0,24}备案")
+    claim_pattern = re.compile(
+        r"(?:首批.{0,12})?(?:通过|完成|拥有|获批|入选).{0,24}(?:网信办|备案)"
+        r"|首批.{0,24}备案|网信办.{0,12}备案"
+    )
+    qualification_pattern = re.compile(
+        r"(?:被认定|拥有|获评|获得|属于|属).{0,30}(?:国家(?:级)?高新技术企业|科技型中小企业|政府.{0,12}资质)"
+        r"|(?:国家(?:级)?高新技术企业|科技型中小企业).{0,30}(?:认定|资质|记录)"
+    )
     sentences = re.findall(r"[^。！？]+[。！？]?", text)
     rewritten: list[str] = []
     for sentence in sentences:
+        if qualification_pattern.search(sentence):
+            rewritten.append(
+                "第三方或企业公开资料转述其具有相关企业资质或荣誉，但本次未取得政府原始记录，不能据此确认政府认定状态。"
+            )
+            continue
         if not claim_pattern.search(sentence):
             rewritten.append(sentence)
             continue
