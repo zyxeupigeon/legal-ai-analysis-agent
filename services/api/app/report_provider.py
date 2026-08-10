@@ -360,6 +360,7 @@ class EvidenceBoundReportDraftProvider:
         draft: ReportDraft,
         audit: CitationAuditResult,
         failures: list[str],
+        task: Task | None = None,
     ) -> ReportDraft:
         """Fail closed by removing unsupported prose instead of forcing template fill."""
         failed = set(failures)
@@ -373,10 +374,33 @@ class EvidenceBoundReportDraftProvider:
             if target_id not in failed and item and item.supported_urls:
                 summaries.append(summary)
                 summary_urls.append(item.supported_urls)
+        identity_urls: list[str] = []
+        identity_claims: set[str] = set()
+        if task is not None:
+            required_claims = {"identity", "operator", "legal_ai_scope"}
+            for source in task.sources:
+                matched_claims = required_claims.intersection(source.supports)
+                if matched_claims:
+                    identity_claims.update(matched_claims)
+                    if source.url not in identity_urls:
+                        identity_urls.append(source.url)
+        identity_fallback_available = bool(
+            task
+            and task.canonical_product_name
+            and task.operator_name
+            and {"identity", "operator", "legal_ai_scope"}.issubset(identity_claims)
+            and identity_urls
+        )
         if not summaries:
-            raise ProviderInvalidResponse(
-                "证据相关性复核后没有任何可保留的摘要，已停止生成Word"
-            )
+            if not identity_fallback_available or task is None:
+                raise ProviderInvalidResponse(
+                    "证据相关性复核后没有任何可保留的摘要，已停止生成Word"
+                )
+            summaries = [
+                f"公开来源可确认{task.canonical_product_name}由{task.operator_name}运营，"
+                "并用于法律AI相关场景；其余分析仅在本次公开证据可直接支持的范围内保留。"
+            ]
+            summary_urls = [identity_urls]
         draft.executive_summary = summaries
         draft.executive_summary_item_source_urls = summary_urls
         draft.executive_summary_source_urls = list(
@@ -397,9 +421,20 @@ class EvidenceBoundReportDraftProvider:
                 insight.source_urls = item.supported_urls
                 insights.append(insight)
         if not insights:
-            raise ProviderInvalidResponse(
-                "证据相关性复核后没有任何可保留的洞察，已停止生成Word"
-            )
+            if not identity_fallback_available:
+                raise ProviderInvalidResponse(
+                    "证据相关性复核后没有任何可保留的洞察，已停止生成Word"
+                )
+            insights = [
+                ReportInsightDraft(
+                    title="公开证据边界较窄",
+                    analysis=(
+                        "当前公开资料足以支持产品身份与法律AI用途，但不足以据此判断"
+                        "经营质量、市场地位或商业化成效。"
+                    ),
+                    source_urls=identity_urls,
+                )
+            ]
         draft.insights = insights
         limitation = "部分摘要、章节或洞察因公开来源不能直接支持具体主张，已从测试稿中缩减或删除。"
         if limitation not in draft.limitations:
@@ -650,7 +685,7 @@ class EvidenceBoundReportDraftProvider:
             )
             audit, audit_failures = self._audit_citations(draft, documents, task)
             if audit_failures:
-                draft = self._prune_failed_targets(draft, audit, audit_failures)
+                draft = self._prune_failed_targets(draft, audit, audit_failures, task)
             else:
                 self._apply_audit_urls(draft, audit)
         product = task.canonical_product_name or task.submitted_product_name

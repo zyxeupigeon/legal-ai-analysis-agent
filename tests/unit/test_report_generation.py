@@ -543,3 +543,46 @@ def test_word_builder_attributes_unverified_ecosystem_filing_claim(tmp_path) -> 
     assert "首批通过国家网信办备案" not in table_text
     assert "企业公开资料称其已完成相关备案" in table_text
     assert "未取得监管公开名单" in table_text
+
+
+def test_report_provider_uses_identity_bound_fallback_when_audit_rejects_all_prose() -> None:
+    identity_url = "https://official.example/product"
+    task = fixture_task()
+    task.sources = [
+        EvidenceSource(
+            url=identity_url,
+            title="产品官网",
+            source_type="official_product",
+            supports=["identity", "operator", "legal_ai_scope"],
+        )
+    ]
+    draft = ReportDraft.model_validate(report_payload([identity_url]))
+    audit = CitationAuditResult(
+        items=[
+            CitationAuditItem(
+                target_id="summary:1",
+                status="unsupported",
+                supported_urls=[],
+                reason="模型摘要未获直接支持。",
+            ),
+            CitationAuditItem(
+                target_id="insight:1",
+                status="unsupported",
+                supported_urls=[],
+                reason="模型洞察未获直接支持。",
+            ),
+        ]
+    )
+
+    pruned = EvidenceBoundReportDraftProvider._prune_failed_targets(
+        draft,
+        audit,
+        ["summary:1", "insight:1"],
+        task,
+    )
+
+    assert task.canonical_product_name in pruned.executive_summary[0]
+    assert task.operator_name in pruned.executive_summary[0]
+    assert pruned.executive_summary_item_source_urls == [[identity_url]]
+    assert [item.title for item in pruned.insights] == ["公开证据边界较窄"]
+    assert pruned.insights[0].source_urls == [identity_url]
