@@ -618,3 +618,18 @@ def test_report_inherits_identity_stage_limitations() -> None:
     draft = provider.generate(task)
 
     assert "身份核验阶段：公司成立年份的公开口径不一致。" in draft.limitations
+
+
+def test_unverified_filing_nouns_and_enterprise_qualifications_are_attributed() -> None:
+    payload = report_payload(["https://actual.example/product"])
+    payload["sections"][0]["paragraphs"] = [
+        "公司拥有国家高新技术企业认证和网信办算法备案，属政府认定记录。"
+    ]
+    provider = EvidenceBoundReportDraftProvider(FakeModel(payload), FakeSearch())
+
+    draft = provider.generate(fixture_task())
+    text = " ".join(draft.sections[0].paragraphs)
+
+    assert "属政府认定记录" not in text
+    assert "拥有国家高新技术企业认证" not in text
+    assert "未取得政府原始记录" in text

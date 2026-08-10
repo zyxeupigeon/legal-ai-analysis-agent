@@ -79,6 +79,7 @@ class TavilySearchProvider:
     def search(self, query: str, *, max_results: int = 5) -> list[SearchDocument]:
         if not self.ready:
             raise ProviderNotConfigured(self.readiness_message)
+        site_domains = list(dict.fromkeys(re.findall(r"site:([A-Za-z0-9.-]+)", query)))
         body = {
             "query": query,
             "search_depth": "basic",
@@ -86,6 +87,8 @@ class TavilySearchProvider:
             "include_answer": False,
             "include_raw_content": False,
         }
+        if site_domains:
+            body["include_domains"] = site_domains
         try:
             with httpx.Client(
                 base_url=self.settings.base_url,

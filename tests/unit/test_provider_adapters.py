@@ -110,6 +110,22 @@ def test_tavily_search_adapter_returns_only_http_documents() -> None:
     assert [item.url for item in documents] == ["https://official.example/product"]
 
 
+def test_tavily_search_adapter_converts_site_filter_to_include_domains() -> None:
+    captured = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"results": []})
+
+    search = TavilySearchProvider(
+        TavilySearchSettings(api_key="tvly-secret", base_url="https://api.tavily.test"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    search.search('"测试产品" site:gov.cn')
+
+    assert captured["body"]["include_domains"] == ["gov.cn"]
+
 def test_bing_rss_test_search_preserves_exact_phrase_and_filters_unrelated_pages() -> None:
     captured_query = ""
     official_html = (
