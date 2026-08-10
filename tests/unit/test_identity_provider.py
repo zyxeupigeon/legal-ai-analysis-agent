@@ -9,7 +9,10 @@ from services.api.app.identity_provider import (
     OpenAIResponsesIdentityProvider,
     ProviderNotConfigured,
     RESEARCH_JSON_SCHEMA,
+    _apply_evidence_rules,
+    _downgrade_unverified_official_sources,
 )
+from services.api.app.models import IdentityResearchResult
 from services.api.app.provider_errors import ProviderUnavailable
 from services.api.app.search_provider import SearchDocument
 
@@ -345,3 +348,42 @@ def test_external_search_continues_query_plan_after_irrelevant_results() -> None
     assert search.queries[0] == '"公开法务助手"'
     assert '"公开法务助手" 法律 AI 产品' in search.queries
     assert len(model.prompts) == 1
+
+
+def test_unverified_official_domain_is_downgraded_and_cannot_confirm_api() -> None:
+    payload = _clear_result()
+    payload["sources"] = [
+        {
+            "url": "https://trusted.example/product",
+            "title": "产品官网",
+            "source_type": "official_product",
+            "supports": ["identity", "operator", "legal_ai_scope"],
+        },
+        {
+            "url": "https://lookalike.example/api",
+            "title": "自称官方的接口页",
+            "source_type": "official_docs",
+            "supports": ["api"],
+        },
+    ]
+    payload["related_products"][0]["source_urls"] = ["https://lookalike.example/api"]
+    result = IdentityResearchResult.model_validate(payload)
+    documents = [
+        SearchDocument(
+            query="test",
+            title="应用商店记录",
+            url="https://apps.apple.com/cn/app/example/id1",
+            content="开发者公开信息；官方网站：https://trusted.example/product 。",
+            retrieval_status="official_app_catalog",
+        ),
+        SearchDocument(query="test", title="官网", url="https://trusted.example/product", content="产品页"),
+        SearchDocument(query="test", title="接口页", url="https://lookalike.example/api", content="接口页"),
+    ]
+
+    _downgrade_unverified_official_sources(result, documents)
+    _apply_evidence_rules(result, {item.url.rstrip("/") for item in documents})
+
+    source_types = {source.url: source.source_type for source in result.sources}
+    assert source_types["https://trusted.example/product"] == "official_product"
+    assert source_types["https://lookalike.example/api"] == "other"
+    assert result.related_products[0].verification_status == "lead_only"

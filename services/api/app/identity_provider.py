@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from hashlib import sha256
 import json
 import os
+import re
 from typing import Any, Protocol
+from urllib.parse import urlparse
 
 import httpx
 from pydantic import ValidationError
@@ -266,6 +268,47 @@ def _normalize_url(url: str) -> str:
     return url.split("#", 1)[0].rstrip("/")
 
 
+def _site_key(url_or_host: str) -> str:
+    host = (urlparse(url_or_host).hostname or url_or_host).lower().strip(".")
+    labels = host.split(".")
+    if len(labels) <= 2:
+        return host
+    if ".".join(labels[-2:]) in {"com.cn", "net.cn", "org.cn", "gov.cn", "ac.cn"}:
+        return ".".join(labels[-3:])
+    return ".".join(labels[-2:])
+
+
+def _externally_verified_official_sites(documents: list[SearchDocument]) -> set[str]:
+    """Return official-site candidates linked by an independent public record."""
+    trusted: set[str] = set()
+    for document in documents:
+        host = (urlparse(document.url).hostname or "").lower()
+        independent_record = (
+            document.retrieval_status == "official_app_catalog"
+            or host in {"apps.apple.com", "sj.qq.com", "appgallery.huawei.com"}
+            or host.endswith((".gov.cn", ".ac.cn"))
+        )
+        if not independent_record:
+            continue
+        for url in re.findall(r"https?://[^\s<>\]\[\"'，。；）)]+", document.content):
+            linked_host = (urlparse(url).hostname or "").lower()
+            if linked_host and linked_host != host:
+                trusted.add(_site_key(linked_host))
+    return trusted
+
+
+def _downgrade_unverified_official_sources(
+    result: IdentityResearchResult,
+    documents: list[SearchDocument],
+) -> None:
+    trusted_sites = _externally_verified_official_sites(documents)
+    if not trusted_sites:
+        return
+    for source in result.sources:
+        if source.source_type.startswith("official_") and _site_key(source.url) not in trusted_sites:
+            source.source_type = "other"
+
+
 def _enforce_search_evidence(
     result: IdentityResearchResult,
     annotations: list[dict[str, Any]],
@@ -306,7 +349,19 @@ def _apply_evidence_rules(
     for related in result.related_products:
         required_claim = "mcp" if related.kind == "mcp" else "api" if related.kind == "api" else "ecosystem"
         supporting_urls = {
-            _normalize_url(source.url) for source in result.sources if required_claim in source.supports
+            _normalize_url(source.url)
+            for source in result.sources
+            if required_claim in source.supports
+            and source.source_type
+            in {
+                "government",
+                "regulator",
+                "official_product",
+                "official_docs",
+                "official_terms",
+                "official_company",
+                "research",
+            }
         }
         if related.verification_status == "confirmed" and not any(
             _normalize_url(url) in supporting_urls for url in related.source_urls
@@ -578,6 +633,7 @@ class ExternalSearchIdentityProvider:
         )
         result.web_search_used = True
         allowed_urls = {_normalize_url(document.url) for document in documents}
+        _downgrade_unverified_official_sources(result, documents)
         _apply_evidence_rules(result, allowed_urls)
         return _normalize_result(result)
 

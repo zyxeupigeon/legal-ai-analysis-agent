@@ -63,6 +63,12 @@ def _set_run_font(run, *, size: float, bold: bool = False, color=BODY) -> None:
     run.font.color.rgb = color
 
 
+def _moderate_ecosystem_regulatory_claim(text: str, *, has_regulatory_source: bool) -> str:
+    if has_regulatory_source or "备案" not in text:
+        return text
+    return "企业公开资料称其已完成相关备案，但本次未取得监管公开名单的直接对应记录。"
+
+
 def _configure_styles(document: Document) -> None:
     tokens = {
         "Normal": (11, BODY, False, 0, 6, 1.10),
@@ -241,6 +247,10 @@ def build_report_docx(
         source.url.split("#", 1)[0].rstrip("/"): index
         for index, source in enumerate(draft.sources, start=1)
     }
+    source_levels = {
+        source.url.split("#", 1)[0].rstrip("/"): source.evidence_level
+        for source in draft.sources
+    }
 
     document.add_heading("报告摘要", level=1)
     for index, paragraph in enumerate(draft.executive_summary):
@@ -280,7 +290,14 @@ def build_report_docx(
             effective_status = item.verification_status
             if effective_status == "confirmed" and not references:
                 effective_status = "lead_only"
-            relation = item.relationship
+            has_regulatory_source = any(
+                source_levels.get(url.split("#", 1)[0].rstrip("/")) == "government_record"
+                for url in item.source_urls
+            )
+            relation = _moderate_ecosystem_regulatory_claim(
+                item.relationship,
+                has_regulatory_source=has_regulatory_source,
+            )
             if references:
                 relation = f"{relation} {references}"
             values = [

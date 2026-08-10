@@ -143,15 +143,21 @@ def _moderate_regulatory_claim(text: str, *, has_regulatory_source: bool) -> str
 
 def _timeline_conflict_note(documents: list[SearchDocument]) -> str | None:
     combined = "\n".join(item.content for item in documents)
-    duration_match = re.search(r"历经\s*(\d{1,2})\s*年", combined)
+    durations = list(dict.fromkeys(re.findall(r"历经\s*(\d{1,2})\s*年", combined)))
+    if len(durations) > 1:
+        quoted = "、".join(f"“历经{duration}年”" for duration in durations)
+        return (
+            f"公开材料存在研发年限口径差异：不同来源分别使用{quoted}的表述；"
+            "目前无法确认各自起算点，不能强行合并为同一时间线。"
+        )
     founded_match = re.search(
         r"(20\d{2})年[^。\n]{0,80}(?:(?:联合实验室|实验室)[^。\n]{0,20}(?:成立|共建)|(?:成立|共建)[^。\n]{0,40}(?:联合实验室|实验室))",
         combined,
     )
-    if not duration_match or not founded_match:
+    if not durations or not founded_match:
         return None
     return (
-        f"公开材料存在时间口径差异：部分产品说明称“历经{duration_match.group(1)}年研发”，"
+        f"公开材料存在时间口径差异：部分产品说明称“历经{durations[0]}年研发”，"
         f"另有机构公开资料记载相关联合实验室于{founded_match.group(1)}年成立；二者可能分别指团队研发历史与实验室存续时间，不能直接视为矛盾或相互替代。"
     )
 
