@@ -586,3 +586,34 @@ def test_report_provider_uses_identity_bound_fallback_when_audit_rejects_all_pro
     assert pruned.executive_summary_item_source_urls == [[identity_url]]
     assert [item.title for item in pruned.insights] == ["公开证据边界较窄"]
     assert pruned.insights[0].source_urls == [identity_url]
+
+
+def test_report_search_plan_targets_public_duration_conflicts() -> None:
+    class RecordedSearch(FakeSearch):
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+
+        def search(self, query: str, *, max_results: int = 5) -> list[SearchDocument]:
+            self.queries.append(query)
+            return super().search(query, max_results=max_results)
+
+    search = RecordedSearch()
+    provider = EvidenceBoundReportDraftProvider(FakeModel(report_payload(["https://actual.example/product"])), search)
+
+    provider._collect_documents(fixture_task())
+
+    assert any("历经 年 研发" in query for query in search.queries)
+    assert any("研发 年限 site:gov.cn" in query for query in search.queries)
+
+
+def test_report_inherits_identity_stage_limitations() -> None:
+    task = fixture_task()
+    task.limitations = ["公司成立年份的公开口径不一致。"]
+    provider = EvidenceBoundReportDraftProvider(
+        FakeModel(report_payload(["https://actual.example/product"])),
+        FakeSearch(),
+    )
+
+    draft = provider.generate(task)
+
+    assert "身份核验阶段：公司成立年份的公开口径不一致。" in draft.limitations
