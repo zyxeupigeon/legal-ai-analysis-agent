@@ -24,6 +24,7 @@ from services.api.app.report_provider import (
     REPORT_SECTION_HEADINGS,
     EvidenceBoundReportDraftProvider,
     FixtureReportDraftProvider,
+    _timeline_conflict_note,
 )
 from services.api.app.search_provider import SearchDocument
 
@@ -495,3 +496,50 @@ def test_word_builder_downgrades_unmapped_confirmed_ecosystem_item(tmp_path) -> 
 
     assert "仅发现公开线索" in table_text
     assert "已由公开来源确认" not in table_text
+
+
+def test_timeline_conflict_detects_multiple_public_duration_claims() -> None:
+    note = _timeline_conflict_note(
+        [
+            SearchDocument(query="test", title="应用说明", url="https://a.example", content="团队历经8年研发。"),
+            SearchDocument(query="test", title="政府介绍", url="https://b.gov.cn", content="团队历经6年研发。"),
+        ]
+    )
+
+    assert note is not None
+    assert "历经8年" in note
+    assert "历经6年" in note
+    assert "无法确认各自起算点" in note
+
+
+def test_word_builder_attributes_unverified_ecosystem_filing_claim(tmp_path) -> None:
+    task = fixture_task()
+    official_url = "https://official.example/model"
+    task.related_products = [
+        RelatedProduct(
+            name="衡法法律大模型",
+            kind="model_platform",
+            relationship="属于首批通过国家网信办备案的法律大模型。",
+            verification_status="confirmed",
+            source_urls=[official_url],
+        )
+    ]
+    draft = FixtureReportDraftProvider().generate(task)
+    draft.sources.append(
+        ReportSourceRecord(
+            url=official_url,
+            title="企业产品页",
+            retrieval_status="identity_stage_verified",
+            source_type="official_product",
+            evidence_level="official_primary",
+        )
+    )
+    output = tmp_path / "ecosystem-filing.docx"
+
+    build_report_docx(draft, task, output)
+    document = Document(output)
+    table_text = "\n".join(cell.text for table in document.tables for row in table.rows for cell in row.cells)
+
+    assert "首批通过国家网信办备案" not in table_text
+    assert "企业公开资料称其已完成相关备案" in table_text
+    assert "未取得监管公开名单" in table_text
