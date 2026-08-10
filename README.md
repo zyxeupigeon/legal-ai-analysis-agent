@@ -1,4 +1,4 @@
-# Legal AI Analysis Agent
+﻿# Legal AI Analysis Agent
 
 面向法律AI产品公开信息研究、证据核验、分析报告生成、Word质检和知识反馈闭环的独立Agent项目。
 
@@ -8,7 +8,7 @@
 
 **P2.3.4网页应用已冻结保留。** FastAPI、Next.js、DeepSeek/Tavily适配和原有启动方式均未删除，P3.0新增文件不进入网页运行链路。详细设计见 docs/architecture/P3_0_PORTABLE_AGENT_PROJECT.md。
 
-P3.0尚未冻结：双Agent入口与预检已通过，首次端到端Word结构交付成功，但得理法搜政府来源覆盖和最终分页质量仍待修复。
+P3.0端到端主路径已通过：双Agent入口与预检通过，Claude Code + DeepSeek V2在不调用原网页/API的情况下完成公开研究、Word生成、8页渲染和独立逐页视觉复核；政府“历经6年”与应用宝“历时8年”口径已并列呈现。P3.0尚未完全冻结，仅剩失败场景安全停止专项验证。
 
 ## 已冻结基线
 
@@ -74,3 +74,4 @@ npm run build
 禁止：把密钥或用户材料、生成报告提交到Git；访问登录、付费或受限页面；未经同意操作用户电脑；把测试稿作为正式报告；建库、训练、部署和多用户开放。
 
 详细架构见 `docs/architecture/P2_3_4_RELEVANCE_CONFLICTS.md`。此前主张绑定方案仍见 `docs/architecture/P2_3_3_CLAIM_EVIDENCE_LOGIC.md`。
+

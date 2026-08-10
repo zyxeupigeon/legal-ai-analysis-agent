@@ -1,4 +1,4 @@
-# P3.0 通用命令行 Agent 项目模式验证
+﻿# P3.0 通用命令行 Agent 项目模式验证
 
 ## 目标
 
@@ -47,7 +47,7 @@
 5. 使用说明不要求固定模型、模型API或MCP。
 6. 网页应用回归检查继续通过。
 
-当前已满足第1、5、6项；第2至4项将在下一轮端到端测试完成。
+当前已满足第1、2、3、5、6项；第4项“失败场景安全停止”仍需专项注入测试，因此P3.0尚未完全冻结。
 ## 首次端到端验收结果
 
 Claude Code + DeepSeek V4已在不调用现有网页/API、不读取旧报告和.env的条件下，独立完成公开检索、11项来源记录、Word生成、PDF及10页PNG渲染。通用结构验收通过，共识别15个唯一来源URL。
@@ -55,3 +55,13 @@ Claude Code + DeepSeek V4已在不调用现有网页/API、不读取旧报告和
 总体仍判FAIL：独立复核发现报告未取得已知深圳发改委来源fgw.sz.gov.cn及其“历经6年”口径，只记录应用宝“历时8年”，未满足P2.3.4冲突回归；末尾页面内容密度亦需优化。VERSION_MANIFEST继续标记failed_pending_evidence_and_layout_fix。
 
 P3.0因此证明架构可运行，但尚未达到冻结条件。后续必须由Agent重新研究，并通过scripts/validate_portable_agent_output.py加载evaluations/p3_delifasou_acceptance.json后再进行独立视觉检查。
+
+## V2端到端回归结果
+
+Claude Code 2.1.226 + DeepSeek V4在同一项目目录完成隔离式V2回归，未调用现有FastAPI/Next网页接口、项目搜索适配器或旧报告流水线。最终产物为8页Word/PDF/PNG，记录11个唯一来源URL。
+
+确定性通用验收与得理法搜专项配置均返回PORTABLE_AGENT_OUTPUT_OK。报告实际引用深圳市发改委fgw.sz.gov.cn“历经6年”口径和应用宝“历时8年”口径，并明确并列说明，不取舍、不合并。
+
+独立人工逐页复核首次发现第3、5、6页存在孤立章节标题；修复标题“与下段同页”属性后重新导出并检查全部8页，最终无裁切、重叠、缺字、表格越界、孤立标题或异常空白。因此端到端主路径判PASS，VERSION_MANIFEST.yaml更新为passed_claude_deepseek_v2_independent_visual_review。
+
+P3.0尚未完全冻结：剩余工作仅为对能力不足、搜索失败或证据不足场景执行专项注入，确认Agent会安全停止且不会伪造结果。
