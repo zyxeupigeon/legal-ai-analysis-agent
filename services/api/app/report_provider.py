@@ -281,6 +281,28 @@ class EvidenceBoundReportDraftProvider:
     ) -> tuple[CitationAuditResult, list[str]]:
         targets = self._audit_targets(draft)
         schema = json.dumps(CitationAuditResult.model_json_schema(), ensure_ascii=False)
+        candidate_urls = {
+            _normalize_url(url)
+            for target in targets
+            for url in target["candidate_urls"]
+        }
+        candidate_documents = [
+            item for item in documents if _normalize_url(item.url) in candidate_urls
+        ]
+        candidate_identity_sources = [
+            item.model_dump(mode="json")
+            for item in task.sources
+            if _normalize_url(item.url) in candidate_urls
+        ]
+        evidence_payload = [
+            {
+                "title": item.title,
+                "url": item.url,
+                "content_excerpt": item.content[:1800],
+                "retrieval_status": item.retrieval_status,
+            }
+            for item in candidate_documents
+        ]
         prompt = f"""证据相关性审计：逐项判断候选URL是否直接支持目标文本中的重要事实。
 
 规则：
@@ -294,7 +316,8 @@ class EvidenceBoundReportDraftProvider:
 {json.dumps(targets, ensure_ascii=False, indent=2)}
 
 任务卡片与实际公开证据：
-{self._context(task, documents)}
+以下内容只保留目标实际引用的证据，未被引用的搜索结果已排除，以避免错配。
+{json.dumps({"public_evidence": evidence_payload, "identity_sources": candidate_identity_sources}, ensure_ascii=False, indent=2)}
 
 输出JSON必须符合：
 {schema}
@@ -325,6 +348,57 @@ class EvidenceBoundReportDraftProvider:
             if not item.supported_urls:
                 failures.append(target_id)
         return audit, failures
+
+    @staticmethod
+    def _prune_failed_targets(
+        draft: ReportDraft,
+        audit: CitationAuditResult,
+        failures: list[str],
+    ) -> ReportDraft:
+        """Fail closed by removing unsupported prose instead of forcing template fill."""
+        failed = set(failures)
+        by_target = {item.target_id: item for item in audit.items}
+
+        summaries: list[str] = []
+        summary_urls: list[list[str]] = []
+        for index, summary in enumerate(draft.executive_summary, start=1):
+            target_id = f"summary:{index}"
+            item = by_target.get(target_id)
+            if target_id not in failed and item and item.supported_urls:
+                summaries.append(summary)
+                summary_urls.append(item.supported_urls)
+        if not summaries:
+            raise ProviderInvalidResponse(
+                "证据相关性复核后没有任何可保留的摘要，已停止生成Word"
+            )
+        draft.executive_summary = summaries
+        draft.executive_summary_item_source_urls = summary_urls
+        draft.executive_summary_source_urls = list(
+            dict.fromkeys(url for urls in summary_urls for url in urls)
+        )
+
+        for index, section in enumerate(draft.sections, start=1):
+            if f"section:{index}" in failed:
+                section.paragraphs = ["当前公开证据不足以形成可靠结论。"]
+                section.key_points = ["本维度暂不作强判断。"]
+                section.source_urls = []
+
+        insights: list[ReportInsightDraft] = []
+        for index, insight in enumerate(draft.insights, start=1):
+            target_id = f"insight:{index}"
+            item = by_target.get(target_id)
+            if target_id not in failed and item and item.supported_urls:
+                insight.source_urls = item.supported_urls
+                insights.append(insight)
+        if not insights:
+            raise ProviderInvalidResponse(
+                "证据相关性复核后没有任何可保留的洞察，已停止生成Word"
+            )
+        draft.insights = insights
+        limitation = "部分摘要、章节或洞察因公开来源不能直接支持具体主张，已从测试稿中缩减或删除。"
+        if limitation not in draft.limitations:
+            draft.limitations.append(limitation)
+        return draft
 
     @staticmethod
     def _apply_audit_urls(draft: ReportDraft, audit: CitationAuditResult) -> None:
@@ -570,12 +644,9 @@ class EvidenceBoundReportDraftProvider:
             )
             audit, audit_failures = self._audit_citations(draft, documents, task)
             if audit_failures:
-                raise ProviderInvalidResponse(
-                    "证据相关性复核仍未通过（"
-                    + "、".join(audit_failures)
-                    + "），已停止生成Word"
-                )
-        self._apply_audit_urls(draft, audit)
+                draft = self._prune_failed_targets(draft, audit, audit_failures)
+            else:
+                self._apply_audit_urls(draft, audit)
         product = task.canonical_product_name or task.submitted_product_name
         draft.report_title = f"{product}标杆分析报告"
         draft.report_subtitle = "法律科技赛道 · P2.3.4证据相关性与冲突处理测试稿"

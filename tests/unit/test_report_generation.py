@@ -6,6 +6,8 @@ from docx import Document
 from docx.oxml.ns import qn
 
 from services.api.app.models import (
+    CitationAuditItem,
+    CitationAuditResult,
     EvidenceSource,
     IdentityGate,
     RelatedProduct,
@@ -214,6 +216,92 @@ def test_report_provider_repairs_citation_relevance_and_reaudits() -> None:
     assert draft.sections[0].source_urls == ["https://actual.example/product"]
     assert any("证据相关性修复任务" in prompt for prompt in model.prompts)
     assert sum("证据相关性审计" in prompt for prompt in model.prompts) == 2
+
+
+def test_report_provider_prunes_only_failed_targets_after_reaudit() -> None:
+    draft = ReportDraft.model_validate(report_payload(["https://actual.example/product"]))
+    draft.executive_summary = ["可保留摘要。", "无支持摘要。"]
+    draft.insights = [
+        ReportInsightDraft(
+            title="可保留洞察",
+            analysis="存在直接证据。",
+            source_urls=["https://actual.example/product"],
+        ),
+        ReportInsightDraft(
+            title="无支持洞察",
+            analysis="没有直接证据。",
+            source_urls=["https://actual.example/product"],
+        ),
+    ]
+    audit = CitationAuditResult(
+        items=[
+            CitationAuditItem(
+                target_id="summary:1",
+                status="supported",
+                supported_urls=["https://actual.example/product"],
+                reason="直接支持。",
+            ),
+            CitationAuditItem(
+                target_id="summary:2",
+                status="unsupported",
+                supported_urls=[],
+                reason="未支持。",
+            ),
+            CitationAuditItem(
+                target_id="section:1",
+                status="unsupported",
+                supported_urls=[],
+                reason="未支持。",
+            ),
+            CitationAuditItem(
+                target_id="insight:1",
+                status="supported",
+                supported_urls=["https://actual.example/product"],
+                reason="直接支持。",
+            ),
+            CitationAuditItem(
+                target_id="insight:2",
+                status="partial",
+                supported_urls=[],
+                reason="仅部分支持。",
+            ),
+        ]
+    )
+
+    pruned = EvidenceBoundReportDraftProvider._prune_failed_targets(
+        draft,
+        audit,
+        ["summary:2", "section:1", "insight:2"],
+    )
+
+    assert pruned.executive_summary == ["可保留摘要。"]
+    assert pruned.executive_summary_item_source_urls == [
+        ["https://actual.example/product"]
+    ]
+    assert pruned.sections[0].paragraphs == ["当前公开证据不足以形成可靠结论。"]
+    assert [item.title for item in pruned.insights] == ["可保留洞察"]
+    assert any("缩减或删除" in item for item in pruned.limitations)
+
+
+def test_report_provider_stops_if_pruning_would_remove_all_summaries() -> None:
+    draft = ReportDraft.model_validate(report_payload(["https://actual.example/product"]))
+    audit = CitationAuditResult(
+        items=[
+            CitationAuditItem(
+                target_id="summary:1",
+                status="unsupported",
+                supported_urls=[],
+                reason="未支持。",
+            )
+        ]
+    )
+
+    with pytest.raises(ProviderInvalidResponse, match="没有任何可保留的摘要"):
+        EvidenceBoundReportDraftProvider._prune_failed_targets(
+            draft,
+            audit,
+            ["summary:1"],
+        )
 
 
 def test_report_provider_normalizes_short_section_list_without_inventing_facts() -> None:
