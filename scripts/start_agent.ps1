@@ -1,7 +1,8 @@
 param(
     [ValidateSet("auto", "claude", "opencode", "codex", "gemini")]
     [string]$Agent = "auto",
-    [switch]$CheckOnly
+    [switch]$CheckOnly,
+    [switch]$SelfTest
 )
 
 $ErrorActionPreference = "Stop"
@@ -38,6 +39,14 @@ Write-Host "Project root: $RepoRoot"
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "check_agent_workspace.ps1")
 if ($LASTEXITCODE -ne 0) {
     throw "Workspace preflight failed. Agent launch stopped."
+}
+
+if ($CheckOnly -and $SelfTest) {
+    throw "Choose either -CheckOnly or -SelfTest, not both."
+}
+if ($SelfTest) {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "self_test_document_pipeline.ps1")
+    exit $LASTEXITCODE
 }
 
 $launchers = [ordered]@{}
