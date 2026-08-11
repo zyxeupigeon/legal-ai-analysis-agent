@@ -60,3 +60,6 @@ Thumbs.db
 ~$*
 *.tmp
 *.temp
+
+agent_outputs/*
+!agent_outputs/.gitkeep

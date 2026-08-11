@@ -1,0 +1,4 @@
+# Frozen baseline files are hashed byte-for-byte. Keep LF on every platform.
+agent/core/v1.1/SYSTEM_PROMPT.md text eol=lf
+agent/core/v1.1/WORKFLOW.md text eol=lf
+agent/skills/legal-report-review-and-verification/SKILL.md text eol=lf
