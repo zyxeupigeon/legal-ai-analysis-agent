@@ -12,7 +12,15 @@
 
 ## Windows启动
 
-在文件资源管理器打开项目目录，在地址栏输入 `powershell` 并回车。然后运行：
+在文件资源管理器打开项目目录，在地址栏输入 `powershell` 并回车。第一次使用先运行：
+
+```powershell
+.\START_AGENT.cmd -SelfTest
+```
+
+它会在临时目录生成最小Word，将其转成PDF和逐页PNG，验证后自动清理。看到 `SELF_TEST_OK` 说明本机文档链路可用；若失败，按错误提示安装Word或LibreOffice、Poppler/pdftoppm，或者改用具备等价文档工具的Agent。
+
+自检通过后运行：
 
 ```powershell
 .\START_AGENT.cmd
