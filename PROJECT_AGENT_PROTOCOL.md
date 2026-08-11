@@ -9,7 +9,7 @@
 ## 启动时必须执行
 
 1. 确认当前工作目录是本仓库根目录。
-2. 完整阅读本文件、agent/core/v1.1/SYSTEM_PROMPT.md、agent/core/v1.1/WORKFLOW.md 和目标任务涉及的 Skill。
+2. 完整阅读本文件、agent/core/v1.1/SYSTEM_PROMPT.md、agent/core/v1.1/WORKFLOW.md 和目标任务涉及的 Skill。涉及寻找、比较、采用或替换开源项目时，还必须完整阅读 OPEN_SOURCE_DISCOVERY_PROTOCOL.md。
 3. 运行 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_agent_workspace.ps1。
 4. 根据预检结果声明本次可用能力和缺失能力。关键能力不足时停止，不得假装已经检索、读取或验证。
 
@@ -36,6 +36,7 @@
 - 冲突口径并列说明，不自行挑选或强行合并。
 - 不访问登录、付费或受限内容；涉及账号、付费、对外发送或扩大权限时先征得用户同意。
 - 不读取、输出、提交或复制 .env、认证缓存、令牌和其他密钥。
+- 开源项目只有在功能精确匹配、许可证兼容、成熟度证据充分且隔离验证通过后才能作为替换候选；近似项目只能交由用户判断。
 - 默认只把产物写入 agent_outputs/，不得覆盖参考报告或冻结报告。
 
 ## 交付要求

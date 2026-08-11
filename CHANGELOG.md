@@ -1,4 +1,11 @@
-﻿# 变更记录
+# 变更记录
+
+## 0.8.0 - 2026-08-11
+
+- P3.0进入可自行试用状态：Claude Code + DeepSeek完成能力不足、搜索失败、身份核心证据不足三类安全停止注入测试，均未补造事实、URL或Word。
+- 增加根目录 `START_AGENT.cmd` 与 `scripts/start_agent.ps1`，Windows使用者可绕过脚本签名问题完成预检并启动已安装的Claude Code或OpenCode。
+- 增加零硬依赖DOCX内容提取回退、MarkItDown/Crawl4AI可选组件隔离评估及对应测试；可选组件不可用时不阻断项目启动。
+- 增加 open-source-discovery-0.1：复用成熟项目发现工具，多源失败回退，精确候选才可建议替换，近似候选只交由用户判断，并增加确定性结果验证和测试。
 
 ## 0.7.0 - 2026-08-10
 

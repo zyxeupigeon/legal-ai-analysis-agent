@@ -5,6 +5,7 @@
 | 路径 | 职责 | 当前状态 |
 |---|---|---|
 | `PROJECT_AGENT_PROTOCOL.md`及根目录适配文件 | 通用命令行 Agent唯一规范与自动发现入口 | P3.0已实现，已由OpenCode和Claude Code验证 |
+| OPEN_SOURCE_DISCOVERY_PROTOCOL.md | 开源项目与元发现工具的候选生成、核验、回退和替换判定协议 | P3.1已实现协议与确定性结果验证 |
 | `apps/web` | Next.js用户界面 | 已实现产品输入、澄清、来源、生态线索、状态、Word生成下载和本地任务列表 |
 | `services/api` | FastAPI应用接口 | 已实现内存任务、可替换模型/搜索适配层、免密钥测试搜索、身份闸门、报告草稿和Word导出接口 |
 | `services/worker` | Agent后台任务、报告与入库 | 空占位 |
@@ -21,7 +22,7 @@
 | `assets` | 许可字体、图表和品牌资产 | 空占位 |
 | `deployment` | 容器、Railway、Supabase和环境声明 | 空占位 |
 | `docs` | 架构、决策、运行、安全和产品说明 | 已加入P2.1、P2.2、P2.3.1至P2.3.4及P3.0实现说明 |
-| `scripts` | 开发与质检脚本 | 已加入冻结基线校验、本地启动脚本和通用Agent能力预检 |
+| `scripts` | 开发与质检脚本 | 已加入冻结基线校验、网页应用启动、通用Agent能力预检、Agent启动器、可选组件评估、参考DOCX零依赖提取和开源候选结果验证 |
 | `agent_outputs` | P3.0命令行Agent隔离产物 | Git忽略，仅保留目录占位 |
 | `artifacts/local` | 本地临时报告与渲染产物 | Git忽略 |
 | `tmp` | 可删除的任务临时文件 | Git忽略 |
