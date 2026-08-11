@@ -23,9 +23,15 @@ P3.0端到端主路径与失败路径均已通过：双Agent入口与预检通�
 
 详细版本和兼容状态见 `VERSION_MANIFEST.yaml`，目录职责见 `PROJECT_STRUCTURE.md`。
 
-## 通用命令行 Agent 启动方法（P3.0）
+## 通用命令行 Agent 启动方法（P3.1）
 
-Windows推荐在项目根目录打开PowerShell后直接运行：
+Windows推荐在项目根目录打开PowerShell。第一次使用先验证本机Word、PDF和逐页图片链路：
+
+```powershell
+.\START_AGENT.cmd -SelfTest
+```
+
+看到 `SELF_TEST_OK` 后启动Agent：
 
 ```powershell
 .\START_AGENT.cmd
@@ -97,4 +103,3 @@ npm run build
 禁止：把密钥或用户材料、生成报告提交到Git；访问登录、付费或受限页面；未经同意操作用户电脑；把测试稿作为正式报告；建库、训练、部署和多用户开放。
 
 详细架构见 `docs/architecture/P2_3_4_RELEVANCE_CONFLICTS.md`。此前主张绑定方案仍见 `docs/architecture/P2_3_3_CLAIM_EVIDENCE_LOGIC.md`。
-
