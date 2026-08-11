@@ -46,9 +46,60 @@ try {
 }
 Add-Check -Name "output_writable" -Passed $writePassed -Detail $outputDirectory
 
-$word = Get-Command winword.exe -ErrorAction SilentlyContinue
-$wordDetail = if ($word) { $word.Source } else { "not on PATH; an Agent may still use Python, LibreOffice, or Word COM" }
-Add-Check -Name "word_cli" -Passed ($null -ne $word) -Detail $wordDetail -Required $false
+$wordComAvailable = $false
+try { $wordComAvailable = $null -ne [Type]::GetTypeFromProgID("Word.Application") } catch { $wordComAvailable = $false }
+$libreOffice = Get-Command soffice, libreoffice -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $libreOffice) {
+    foreach ($candidate in @(
+        "C:\Program Files\LibreOffice\program\soffice.exe",
+        "C:\Program Files (x86)\LibreOffice\program\soffice.exe"
+    )) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            $libreOffice = Get-Item -LiteralPath $candidate
+            break
+        }
+    }
+}
+$converterPassed = $wordComAvailable -or ($null -ne $libreOffice)
+if ($wordComAvailable) {
+    $converterDetail = "Microsoft Word COM"
+}
+elseif ($libreOffice) {
+    $converterDetail = if ($libreOffice.Source) { $libreOffice.Source } else { $libreOffice.FullName }
+}
+else {
+    $converterDetail = "not found; install Microsoft Word or LibreOffice, or use an Agent with equivalent rendering"
+}
+Add-Check -Name "docx_to_pdf" -Passed $converterPassed -Detail $converterDetail -Required $false
+
+$pageRendererCommand = Get-Command pdftoppm.exe, pdftoppm -ErrorAction SilentlyContinue | Select-Object -First 1
+$pageRendererPath = $null
+if ($pageRendererCommand) {
+    $pageRendererPath = if ($pageRendererCommand.Source) { $pageRendererCommand.Source } else { $pageRendererCommand.Path }
+    if ([IO.Path]::GetExtension($pageRendererPath) -ine ".exe") {
+        $searchRoot = Split-Path -Parent $pageRendererPath
+        for ($depth = 0; $depth -lt 3 -and $searchRoot; $depth++) {
+            foreach ($relativePath in @(
+                "pdftoppm.exe",
+                "Library\bin\pdftoppm.exe",
+                "native\poppler\Library\bin\pdftoppm.exe"
+            )) {
+                $candidate = Join-Path $searchRoot $relativePath
+                if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                    $pageRendererPath = $candidate
+                    break
+                }
+            }
+            if ([IO.Path]::GetExtension($pageRendererPath) -ieq ".exe") { break }
+            $searchRoot = Split-Path -Parent $searchRoot
+        }
+    }
+}
+$rendererDetail = if ($pageRendererPath) { $pageRendererPath } else { "not found; install Poppler/pdftoppm, or use an Agent with equivalent rendering" }
+Add-Check -Name "pdf_to_png" -Passed ($null -ne $pageRendererPath) -Detail $rendererDetail -Required $false
+
+$selfTestScript = Join-Path $expectedRoot "scripts\self_test_document_pipeline.ps1"
+Add-Check -Name "self_test_script" -Passed (Test-Path -LiteralPath $selfTestScript -PathType Leaf) -Detail $selfTestScript
 
 $checks | Format-Table -AutoSize
 $failedRequired = @($checks | Where-Object { $_.Required -and -not $_.Passed })
@@ -57,5 +108,7 @@ if ($failedRequired.Count -gt 0) {
     exit 1
 }
 
-Write-Output "PREFLIGHT_OK protocol=portable-agent-poc-0.1"
+Write-Output "PREFLIGHT_BASE_OK protocol=portable-agent-poc-0.1"
+Write-Output ("LOCAL_DOCUMENT_PIPELINE_READY " + ($converterPassed -and ($null -ne $pageRendererPath)).ToString().ToLowerInvariant())
+Write-Output "TIP run START_AGENT.cmd -SelfTest before the first real analysis"
 Write-Output "NOTE internet search, page reading, model access, and visual document inspection must be declared by the running Agent; this local script cannot prove them."
