@@ -14,12 +14,17 @@ function Add-Check {
 }
 
 Add-Check -Name "project_root" -Passed ($currentRoot -ieq $expectedRoot) -Detail "current=$currentRoot; expected=$expectedRoot"
+$declaredRoot = $env:LEGAL_AI_PROJECT_ROOT
+$bindingPassed = (-not $declaredRoot) -or ([IO.Path]::GetFullPath($declaredRoot).TrimEnd("\") -ieq $expectedRoot)
+$bindingDetail = if ($declaredRoot) { "launcher=$declaredRoot; expected=$expectedRoot" } else { "launcher binding not set; current directory is authoritative" }
+Add-Check -Name "launcher_root_binding" -Passed $bindingPassed -Detail $bindingDetail
 
 $requiredFiles = @(
     "PROJECT_AGENT_PROTOCOL.md",
     "agent\core\v1.1\SYSTEM_PROMPT.md",
     "agent\core\v1.1\WORKFLOW.md",
-    "agent\skills\legal-report-review-and-verification\SKILL.md"
+    "agent\skills\legal-report-review-and-verification\SKILL.md",
+    "scripts\create_task_workspace.py"
 )
 foreach ($relativePath in $requiredFiles) {
     $fullPath = Join-Path $expectedRoot $relativePath
@@ -39,7 +44,7 @@ if (-not (Test-Path -LiteralPath $outputDirectory)) { New-Item -ItemType Directo
 $probePath = Join-Path $outputDirectory ".write_probe"
 $writePassed = $false
 try {
-    Set-Content -LiteralPath $probePath -Value "portable-agent-poc-0.1" -Encoding UTF8
+    Set-Content -LiteralPath $probePath -Value "portable-agent-0.3" -Encoding UTF8
     $writePassed = Test-Path -LiteralPath $probePath -PathType Leaf
 } finally {
     if (Test-Path -LiteralPath $probePath) { Remove-Item -LiteralPath $probePath -Force }
@@ -108,7 +113,7 @@ if ($failedRequired.Count -gt 0) {
     exit 1
 }
 
-Write-Output "PREFLIGHT_BASE_OK protocol=portable-agent-poc-0.1"
+Write-Output "PREFLIGHT_BASE_OK protocol=portable-agent-0.3"
 Write-Output ("LOCAL_DOCUMENT_PIPELINE_READY " + ($converterPassed -and ($null -ne $pageRendererPath)).ToString().ToLowerInvariant())
 Write-Output "TIP run START_AGENT.cmd -SelfTest before the first real analysis"
 Write-Output "NOTE internet search, page reading, model access, and visual document inspection must be declared by the running Agent; this local script cannot prove them."

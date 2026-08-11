@@ -6,8 +6,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$RepoRoot = Split-Path -Parent $PSScriptRoot
+$RepoRoot = (Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
 Set-Location $RepoRoot
+$env:LEGAL_AI_PROJECT_ROOT = $RepoRoot
+$env:LEGAL_AI_OUTPUT_ROOT = Join-Path $RepoRoot "agent_outputs"
+$env:LEGAL_AI_PROTOCOL_ID = "portable-agent-0.3"
 
 function Resolve-AgentLauncher([string]$Name) {
     $command = Get-Command $Name -ErrorAction SilentlyContinue
@@ -36,6 +39,7 @@ function Resolve-AgentLauncher([string]$Name) {
 
 Write-Host "Legal AI Analysis Project - Agent launcher" -ForegroundColor Cyan
 Write-Host "Project root: $RepoRoot"
+Write-Host "Output root: $env:LEGAL_AI_OUTPUT_ROOT"
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "check_agent_workspace.ps1")
 if ($LASTEXITCODE -ne 0) {
     throw "Workspace preflight failed. Agent launch stopped."
@@ -78,7 +82,8 @@ if (-not $selected -or -not $launchers[$selected]) {
 
 Write-Host ""
 Write-Host "Launching: $selected" -ForegroundColor Green
-Write-Host "After the Agent opens, ask it to read PROJECT_AGENT_PROTOCOL.md and analyze your legal AI product."
+Write-Host "This session is bound to: $env:LEGAL_AI_PROJECT_ROOT"
+Write-Host "After the Agent opens, ask it to read PROJECT_AGENT_PROTOCOL.md, allocate a task workspace, and analyze your legal AI product."
 Write-Host ""
 
 if ($selected -eq "opencode") {

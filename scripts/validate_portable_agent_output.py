@@ -21,6 +21,13 @@ def docx_text(path):
     return "".join(node.text or "" for node in root.iter() if node.tag.endswith("}t"))
 
 
+def required_context_path(context, key):
+    value = context.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"task context field is missing: {key}")
+    return Path(value).resolve()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output_dir", type=Path)
@@ -28,10 +35,18 @@ def main():
     args = parser.parse_args()
 
     output_dir = args.output_dir.resolve()
+    project_root = Path(__file__).resolve().parents[1]
+    output_root = (project_root / "agent_outputs").resolve()
+    if not output_dir.is_relative_to(output_root):
+        print("PORTABLE_AGENT_OUTPUT_FAIL")
+        print(f"- output directory is outside this project agent_outputs: {output_dir}")
+        return 1
+
     profile = json.loads(args.profile.read_text(encoding="utf-8")) if args.profile else {}
     errors = []
 
     required = [
+        output_dir / "task_context.json",
         output_dir / "report.docx",
         output_dir / "sources.md",
         output_dir / "run_summary.md",
@@ -41,6 +56,21 @@ def main():
     for path in required:
         if not path.is_file() or path.stat().st_size == 0:
             fail(errors, f"missing or empty: {path.name}")
+
+    context_path = output_dir / "task_context.json"
+    if context_path.is_file():
+        try:
+            context = json.loads(context_path.read_text(encoding="utf-8"))
+            if context.get("protocol_id") != "portable-agent-0.3":
+                fail(errors, "task context protocol id is not portable-agent-0.3")
+            if required_context_path(context, "project_root") != project_root:
+                fail(errors, "task context project root does not match this project")
+            if required_context_path(context, "output_root") != output_root:
+                fail(errors, "task context output root does not match this project")
+            if required_context_path(context, "task_output_dir") != output_dir:
+                fail(errors, "task context task output directory does not match validated directory")
+        except (json.JSONDecodeError, OSError, TypeError, ValueError) as exc:
+            fail(errors, f"task_context.json is unreadable or invalid: {exc}")
 
     pages = sorted((output_dir / "render").glob("page-*.png"))
     if not pages:

@@ -14,33 +14,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check whitespace and repository state
-        run: git diff --check
-
-      - name: Check required files and frozen values
+      - name: Check whitespace and required files
         shell: bash
         run: |
           set -euo pipefail
-          for path in README.md PROJECT_STRUCTURE.md VERSION_MANIFEST.yaml CHANGELOG.md .gitignore .env.example CONTRIBUTING.md SECURITY.md NOTICE.md; do
+          git diff --check
+          for path in README.md PROJECT_STRUCTURE.md VERSION_MANIFEST.yaml CHANGELOG.md PROJECT_AGENT_PROTOCOL.md START_AGENT.cmd scripts/create_task_workspace.py scripts/check_agent_workspace.ps1 scripts/self_test_document_pipeline.ps1; do
             test -f "$path" || { echo "Missing $path"; exit 1; }
           done
-          project_phase="$(sed -n 's/^project_phase: "\([^"]*\)"$/\1/p' VERSION_MANIFEST.yaml)"
-          test -n "$project_phase" || { echo 'Missing project_phase in VERSION_MANIFEST.yaml'; exit 1; }
-          [[ "$project_phase" =~ ^P[0-9]+(\.[0-9]+)+$ ]] || {
-            echo "Invalid project_phase format: $project_phase"
-            exit 1
-          }
-          grep -Fq 'repository_visibility: "private"' VERSION_MANIFEST.yaml
-          grep -Fq 'agent_core: "1.1"' VERSION_MANIFEST.yaml
-          grep -Fq 'business_code_allowed: true' VERSION_MANIFEST.yaml
-          grep -Fq 'real_secrets_allowed: false' VERSION_MANIFEST.yaml
-          grep -Fq 'database_allowed: false' VERSION_MANIFEST.yaml
-          grep -Fq 'real_model_calls_allowed: true' VERSION_MANIFEST.yaml
-          grep -Fq 'public_web_research_allowed: true' VERSION_MANIFEST.yaml
-          grep -Fq 'local_test_report_generation_allowed: true' VERSION_MANIFEST.yaml
-          grep -Fq 'formal_report_publication_allowed: false' VERSION_MANIFEST.yaml
-          grep -Fq 'training_allowed: false' VERSION_MANIFEST.yaml
-          grep -Fq 'openai_store_responses: false' VERSION_MANIFEST.yaml
+          grep -Fq 'project_phase: "P3.2"' VERSION_MANIFEST.yaml
+          grep -Fq 'protocol_id: "portable-agent-0.3"' VERSION_MANIFEST.yaml
+          grep -Fq 'present_on_main: false' VERSION_MANIFEST.yaml
+          test ! -d apps/web
+          test ! -d services/api
 
       - name: Block likely secrets and runtime materials
         shell: bash
@@ -55,30 +41,12 @@ jobs:
       - name: Verify frozen baseline hashes
         run: python scripts/check_baselines.py
 
-  api-tests:
+  portable-agent-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: services/api/requirements.txt
-      - run: pip install -r services/api/requirements.txt
+      - run: python -m pip install pytest
       - run: python -m pytest -q
-
-  web-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - working-directory: apps/web
-        run: npm ci
-      - working-directory: apps/web
-        run: npm run typecheck
-      - working-directory: apps/web
-        run: npm run build
