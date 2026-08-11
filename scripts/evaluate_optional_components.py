@@ -1,9 +1,8 @@
 """Evaluate optional document and web extraction components in isolation.
 
-This script does not install packages and does not call the frozen FastAPI/Next.js
-application.  It records whether optional components are available and, when a
-sample is supplied, whether they can produce useful text for the portable-agent
-workflow.
+This script does not install packages or call an application service. It records
+whether optional components are available and, when a sample is supplied,
+whether they can produce useful text for the portable-agent workflow.
 """
 
 from __future__ import annotations
