@@ -23,7 +23,7 @@ jobs:
             test -f "$path" || { echo "Missing $path"; exit 1; }
           done
           grep -Fq 'project_phase: "P3.2"' VERSION_MANIFEST.yaml
-          grep -Fq 'protocol_id: "portable-agent-0.5"' VERSION_MANIFEST.yaml
+          grep -Fq 'protocol_id: "portable-agent-0.6"' VERSION_MANIFEST.yaml
           grep -Fq 'present_on_main: false' VERSION_MANIFEST.yaml
           test ! -d apps/web
           test ! -d services/api

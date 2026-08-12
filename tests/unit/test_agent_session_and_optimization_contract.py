@@ -11,7 +11,7 @@ def test_every_agent_entry_requires_first_message_preflight_and_delivery_paths()
     for relative_path in ("AGENTS.md", "CLAUDE.md", "GEMINI.md"):
         text = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
         assert "first user message of every new session" in text
-        assert "Start the first reply by reporting the preflight result" in text
+        assert "Start the first reply with SESSION_PREFLIGHT_READY or SESSION_PREFLIGHT_BLOCKED" in text
         assert "process_optimization_report.md" in text
         assert "absolute path and filename" in text
 
@@ -22,8 +22,12 @@ def test_protocol_defines_optimization_report_contract() -> None:
         encoding="utf-8"
     )
 
-    assert "协议编号：portable-agent-0.5" in protocol
+    assert "协议编号：portable-agent-0.6" in protocol
     assert "新会话的第一项动作必须是项目预检" in protocol
+    assert "SESSION_PREFLIGHT_READY" in protocol
+    assert "SESSION_PREFLIGHT_BLOCKED" in protocol
+    assert "不得运行任务目录分配器" in protocol
+    assert "不得生成正式 Word" in protocol
     assert "process_optimization_report.md" in protocol
     assert "文件名和绝对路径" in protocol
     for section in (

@@ -29,7 +29,7 @@
 .\START_AGENT.cmd -Agent opencode
 ```
 
-Agent收到每个新会话的第一条消息后，必须先运行项目预检，并在首次回复开头报告结果；预检通过后才会处理你的原始消息。
+Agent收到每个新会话的第一条消息后，必须先运行项目预检和任务所需能力检查。只有无需你额外决定、无需重启且可以在当前对话直接正常运行时，才回复 `SESSION_PREFLIGHT_READY` 并继续。需要非低风险修复、安装、登录、授权、重启或关键能力无法立即恢复时，必须回复 `SESSION_PREFLIGHT_BLOCKED`，不创建任务目录、不研究、不生成报告，只说明问题和你需要做的操作。
 
 ## 输入什么
 
@@ -44,7 +44,7 @@ Agent收到每个新会话的第一条消息后，必须先运行项目预检，
 启动器会显示 `Project root` 和 `Output root`。Agent必须：
 
 1. 确认当前绝对目录与 `LEGAL_AI_PROJECT_ROOT` 相同；
-2. 运行 `python scripts/create_task_workspace.py --task-id <唯一任务ID>`；
+2. 运行 `python scripts/create_task_workspace.py --task-id <唯一任务ID> --session-gate READY`；
 3. 只向返回的绝对 `TASK_OUTPUT_DIR` 写文件。
 
 如果出现 `TASK_WORKSPACE_FAIL`，不要改用父目录、同级旧项目或历史任务目录；应先纠正工作目录并重新启动Agent。
@@ -66,4 +66,4 @@ Agent收到每个新会话的第一条消息后，必须先运行项目预检，
 
 ## 正常停止情形
 
-缺少联网或正文读取能力、产品身份不明确、关键证据不足、无法生成Word/PDF/页面图片、无法视觉检查或根目录绑定不一致时，Agent应停止或标为PARTIAL，不得凭模型记忆补写。
+若自检发现缺少联网或正文读取能力、无法生成Word/PDF/页面图片、无法视觉检查、根目录绑定不一致，或修复需要你确认、安装、授权、登录或重启，Agent必须在生成报告前停止并报告 BLOCKED，不得凭模型记忆补写或生成PARTIAL报告。进入研究后才出现的证据不足，按协议缩减、停止或如实处理。

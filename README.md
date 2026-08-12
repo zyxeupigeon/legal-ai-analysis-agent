@@ -20,7 +20,7 @@
 
 当前启动器可识别Claude Code、OpenCode、Codex CLI和Gemini CLI；已完成端到端验证的是Claude Code和OpenCode。
 
-Agent收到新会话的第一条消息后，会先自动执行项目预检并报告结果，再处理消息。进入Agent后输入：
+Agent收到新会话的第一条消息后，会先自动执行项目预检和能力闸门。只有回复 `SESSION_PREFLIGHT_READY` 才会继续；若回复 `SESSION_PREFLIGHT_BLOCKED`，不会生成报告，而会说明需要你确认、处理或重启的事项。进入Agent后输入：
 
 ```text
 请完整读取项目协议，然后分析法律AI产品“得理法搜”，生成并质检Word报告。
@@ -31,7 +31,7 @@ Agent收到新会话的第一条消息后，会先自动执行项目预检并报
 启动器会把当前项目的绝对路径写入 `LEGAL_AI_PROJECT_ROOT`。Agent在写入任何任务文件前必须运行：
 
 ```powershell
-python scripts/create_task_workspace.py --task-id <本次唯一任务ID>
+python scripts/create_task_workspace.py --task-id <本次唯一任务ID> --session-gate READY
 ```
 
 只有返回 `TASK_WORKSPACE_OK` 后才能继续，全部产物必须写入返回的绝对 `TASK_OUTPUT_DIR`。若Agent复用了另一份项目副本、旧会话或错误工作目录，分配器会停止任务，避免报告写到同级旧项目。

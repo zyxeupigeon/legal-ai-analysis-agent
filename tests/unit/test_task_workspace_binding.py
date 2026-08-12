@@ -26,13 +26,14 @@ def configure_project(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 def test_task_workspace_is_anchored_to_current_project(monkeypatch, tmp_path):
     project_root = configure_project(monkeypatch, tmp_path)
 
-    output_dir = MODULE.allocate("delifasou_20260811")
+    output_dir = MODULE.allocate("delifasou_20260811", "READY")
 
     assert output_dir == project_root / "agent_outputs" / "delifasou_20260811"
     context = json.loads((output_dir / "task_context.json").read_text(encoding="utf-8"))
     assert Path(context["project_root"]) == project_root
     assert Path(context["task_output_dir"]) == output_dir
-    assert context["protocol_id"] == "portable-agent-0.5"
+    assert context["protocol_id"] == "portable-agent-0.6"
+    assert context["session_gate"] == "READY"
     assert set(context["protected_project_hashes"]) == {"PROJECT_AGENT_PROTOCOL.md"}
 
 
@@ -43,7 +44,7 @@ def test_wrong_current_directory_is_rejected(monkeypatch, tmp_path):
     monkeypatch.chdir(wrong_directory)
 
     with pytest.raises(RuntimeError, match="current working directory"):
-        MODULE.allocate("must_fail")
+        MODULE.allocate("must_fail", "READY")
 
     assert not (project_root / "agent_outputs" / "must_fail").exists()
 
@@ -53,14 +54,23 @@ def test_launcher_root_mismatch_is_rejected(monkeypatch, tmp_path):
     monkeypatch.setenv("LEGAL_AI_PROJECT_ROOT", str(tmp_path / "different-project"))
 
     with pytest.raises(RuntimeError, match="launcher project root"):
-        MODULE.allocate("must_fail")
+        MODULE.allocate("must_fail", "READY")
 
     assert not (project_root / "agent_outputs" / "must_fail").exists()
 
 
 def test_existing_task_directory_is_not_reused(monkeypatch, tmp_path):
     configure_project(monkeypatch, tmp_path)
-    MODULE.allocate("unique_task")
+    MODULE.allocate("unique_task", "READY")
 
     with pytest.raises(FileExistsError):
-        MODULE.allocate("unique_task")
+        MODULE.allocate("unique_task", "READY")
+
+
+def test_blocked_session_cannot_create_task_workspace(monkeypatch, tmp_path):
+    project_root = configure_project(monkeypatch, tmp_path)
+
+    with pytest.raises(RuntimeError, match="session preflight is not READY"):
+        MODULE.allocate("blocked_task", "BLOCKED")
+
+    assert not (project_root / "agent_outputs" / "blocked_task").exists()

@@ -13,7 +13,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_ROOT = PROJECT_ROOT / "agent_outputs"
-PROTOCOL_ID = "portable-agent-0.5"
+PROTOCOL_ID = "portable-agent-0.6"
 TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
 PROTECTED_FIXED_PATHS = (
     "PROJECT_AGENT_PROTOCOL.md",
@@ -60,9 +60,13 @@ def verify_project_binding() -> None:
         )
 
 
-def allocate(task_id: str) -> Path:
+def allocate(task_id: str, session_gate: str) -> Path:
     if not TASK_ID_PATTERN.fullmatch(task_id):
         raise ValueError("task id must use 1-80 ASCII letters, digits, underscores, or hyphens")
+    if session_gate != "READY":
+        raise RuntimeError(
+            "session preflight is not READY; do not create a task workspace or generate a report"
+        )
     verify_project_binding()
     project_hashes = protected_project_hashes()
     output_dir = (OUTPUT_ROOT / task_id).resolve()
@@ -75,6 +79,7 @@ def allocate(task_id: str) -> Path:
         "output_root": str(OUTPUT_ROOT.resolve()),
         "task_output_dir": str(output_dir),
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "session_gate": session_gate,
         "protected_project_hashes": project_hashes,
     }
     (output_dir / "task_context.json").write_text(
@@ -86,9 +91,10 @@ def allocate(task_id: str) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task-id", required=True)
+    parser.add_argument("--session-gate", required=True, choices=("READY", "BLOCKED"))
     args = parser.parse_args()
     try:
-        output_dir = allocate(args.task_id)
+        output_dir = allocate(args.task_id, args.session_gate)
     except (FileExistsError, OSError, RuntimeError, ValueError) as exc:
         print("TASK_WORKSPACE_FAIL")
         print(f"- {exc}")

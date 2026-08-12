@@ -1,6 +1,6 @@
 # 法律AI产品分析项目 Agent 协议
 
-协议编号：portable-agent-0.5
+协议编号：portable-agent-0.6
 
 ## 目的
 
@@ -9,17 +9,21 @@
 ## 启动和任务目录绑定
 
 1. **新会话的第一项动作必须是项目预检。** 无论使用者第一句话是分析请求、普通问题、问候还是其他内容，Agent 都必须先确认当前工作目录和根目录绑定，完整读取本协议，并运行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_agent_workspace.ps1`。在预检完成前，不得实质回答问题、开始研究或调用任务工具。
-2. 首次回复必须先用一句话明确报告 `PREFLIGHT_BASE_OK` 或失败原因，然后再处理使用者的原始消息。一个连续会话只需执行一次；启动新会话、切换项目副本或根目录变化后必须重新执行。
-3. 确认当前工作目录是本仓库根目录，即当前目录中同时存在 `START_AGENT.cmd`、`PROJECT_AGENT_PROTOCOL.md` 和 `scripts/create_task_workspace.py`。
-4. 若环境变量 `LEGAL_AI_PROJECT_ROOT` 存在，必须确认其绝对路径与当前仓库根目录完全相同；不同时立即停止。这通常表示 Agent 复用了另一份项目副本或旧会话。
-5. 完整阅读 `agent/core/v1.1/SYSTEM_PROMPT.md`、`agent/core/v1.1/WORKFLOW.md` 和目标任务涉及的 Skill。涉及寻找、比较、采用或替换开源项目时，还必须完整阅读 `OPEN_SOURCE_DISCOVERY_PROTOCOL.md`。
-6. 根据预检结果声明本次可用能力和缺失能力。关键能力不足时停止，不得假装已经检索、读取或验证。
-7. 在写入任何任务文件前运行：
+2. `PREFLIGHT_BASE_OK` 只表示基础目录与本机文档链路检查结束，不等于当前会话能够正常完成项目。Agent 还必须检查原始请求所需的联网检索、网页正文读取、Word生成、PDF/PNG渲染、图片查看和其他关键能力。
+3. 自检后必须二选一声明：
+   - `SESSION_PREFLIGHT_READY`：当前会话可在无需使用者额外决定、无需重启或重新登录的情况下，直接正常执行原始请求；
+   - `SESSION_PREFLIGHT_BLOCKED`：存在会阻止当前会话直接正常执行项目的条件。
+4. 只有无风险或低风险、无需使用者确认且无需重启的修复可以自动执行，例如清理本次临时探针、纠正项目内命令、使用已安装的等效工具或调整当前进程的非安全性编码设置。自动修复后必须重新预检；复检通过才能声明 READY。
+5. 出现以下任一情况必须声明 BLOCKED：需要使用者在多种非低风险方案中选择；需要更改执行策略、安全策略、系统配置或文件信任标记；需要安装关键依赖、登录或重新认证、启用浏览器/MCP/插件、扩大权限；需要重启 Agent、终端、电脑或应用；关键能力在当前连续会话中无法立即恢复；或其他会使接下来的对话不能直接正常运行完整项目的情形。
+6. BLOCKED 时不得运行任务目录分配器，不得开始事实研究，不得创建 `report.docx`、草稿报告或其他正式报告产物。必须立即告诉使用者：阻断项、影响、为什么不能直接继续、建议操作、风险和是否需要重启；等待使用者处理并开启可用会话后重新自检。
+7. 即使已开始任务，若在正式报告生成前发现新的上述阻断条件，也必须停止，不得用降级能力生成冒充完整结果的报告；可以保留已产生的诊断记录，但不得生成正式 Word。
+8. 确认当前工作目录是本仓库根目录，即当前目录中同时存在 `START_AGENT.cmd`、`PROJECT_AGENT_PROTOCOL.md` 和 `scripts/create_task_workspace.py`。若环境变量 `LEGAL_AI_PROJECT_ROOT` 存在，其绝对路径必须与当前仓库根目录完全相同；不同时声明 BLOCKED。
+9. 完整阅读 `agent/core/v1.1/SYSTEM_PROMPT.md`、`agent/core/v1.1/WORKFLOW.md` 和目标任务涉及的 Skill。涉及寻找、比较、采用或替换开源项目时，还必须完整阅读 `OPEN_SOURCE_DISCOVERY_PROTOCOL.md`。
+10. 只有声明 `SESSION_PREFLIGHT_READY` 后，才可在写入任何任务文件前运行：
 
-   `python scripts/create_task_workspace.py --task-id <本次唯一任务ID>`
+   `python scripts/create_task_workspace.py --task-id <本次唯一任务ID> --session-gate READY`
 
-8. 只有看到 `TASK_WORKSPACE_OK` 后才能继续，并且必须把其返回的绝对 `TASK_OUTPUT_DIR` 作为本次唯一写入目录。不得自行使用相对路径猜测输出位置，不得写入父目录、同级项目副本或历史任务目录。
-9. 若任务目录已存在、当前目录不正确或启动器根目录绑定不一致，分配器会失败；此时必须停止并向用户报告，不得改写到另一位置。
+11. 只有看到 `TASK_WORKSPACE_OK` 后才能继续，并且必须把其返回的绝对 `TASK_OUTPUT_DIR` 作为本次唯一写入目录。若闸门不是 READY、任务目录已存在、当前目录不正确或根目录绑定不一致，分配器会失败；此时必须停止并向使用者报告，不得改写到另一位置。
 
 ## 最低能力要求
 
