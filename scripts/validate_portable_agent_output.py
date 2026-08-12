@@ -1,6 +1,8 @@
 import argparse
+import hashlib
 import json
 import re
+import statistics
 import sys
 import zipfile
 from pathlib import Path
@@ -9,6 +11,10 @@ from xml.etree import ElementTree as ET
 
 def fail(errors, message):
     errors.append(message)
+
+
+def file_sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def docx_text(path):
@@ -28,6 +34,42 @@ def required_context_path(context, key):
     return Path(value).resolve()
 
 
+def verify_project_integrity(context, project_root, errors):
+    protected_hashes = context.get("protected_project_hashes")
+    if not isinstance(protected_hashes, dict) or not protected_hashes:
+        fail(errors, "task context has no protected project file snapshot")
+        return
+    for relative_path, expected_hash in protected_hashes.items():
+        if not isinstance(relative_path, str) or not isinstance(expected_hash, str):
+            fail(errors, "task context protected project file snapshot is invalid")
+            continue
+        path = (project_root / relative_path).resolve()
+        if not path.is_relative_to(project_root):
+            fail(errors, f"protected project path escaped project root: {relative_path}")
+        elif not path.is_file():
+            fail(errors, f"protected project file was deleted during task: {relative_path}")
+        elif file_sha256(path) != expected_hash:
+            fail(errors, f"protected project file changed during task: {relative_path}")
+
+
+def page_layout_warnings(pages):
+    if len(pages) < 4:
+        return []
+    comparison_sizes = [page.stat().st_size for page in pages[1:-1]]
+    median_size = statistics.median(comparison_sizes)
+    last_size = pages[-1].stat().st_size
+    if median_size and last_size < median_size * 0.55:
+        return [
+            "last rendered page is unusually sparse; inspect table continuation, page breaks, and trailing whitespace"
+        ]
+    return []
+
+
+def declared_summary_status(summary_text):
+    match = re.search(r"(?:总体状态|最终状态)\s*[：:]\s*\*{0,2}(PASS|PARTIAL|FAIL)", summary_text, re.I)
+    return match.group(1).upper() if match else "UNDECLARED"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output_dir", type=Path)
@@ -42,8 +84,31 @@ def main():
         print(f"- output directory is outside this project agent_outputs: {output_dir}")
         return 1
 
-    profile = json.loads(args.profile.read_text(encoding="utf-8")) if args.profile else {}
     errors = []
+    warnings = []
+    context = {}
+    context_path = output_dir / "task_context.json"
+    if context_path.is_file():
+        try:
+            context = json.loads(context_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            fail(errors, f"task_context.json is unreadable or invalid: {exc}")
+
+    profile = {}
+    if args.profile:
+        profile_path = args.profile.resolve()
+        try:
+            if profile_path.is_relative_to(project_root):
+                relative_profile = profile_path.relative_to(project_root).as_posix()
+                protected_hashes = context.get("protected_project_hashes", {})
+                expected_hash = protected_hashes.get(relative_profile)
+                if not expected_hash:
+                    fail(errors, f"project profile was not snapshotted at task start: {relative_profile}")
+                elif not profile_path.is_file() or file_sha256(profile_path) != expected_hash:
+                    fail(errors, f"project profile changed during task: {relative_profile}")
+            profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            fail(errors, f"profile is unreadable or invalid: {exc}")
 
     required = [
         output_dir / "task_context.json",
@@ -58,24 +123,25 @@ def main():
         if not path.is_file() or path.stat().st_size == 0:
             fail(errors, f"missing or empty: {path.name}")
 
-    context_path = output_dir / "task_context.json"
-    if context_path.is_file():
+    if context:
         try:
-            context = json.loads(context_path.read_text(encoding="utf-8"))
-            if context.get("protocol_id") != "portable-agent-0.4":
-                fail(errors, "task context protocol id is not portable-agent-0.4")
+            if context.get("protocol_id") != "portable-agent-0.5":
+                fail(errors, "task context protocol id is not portable-agent-0.5")
             if required_context_path(context, "project_root") != project_root:
                 fail(errors, "task context project root does not match this project")
             if required_context_path(context, "output_root") != output_root:
                 fail(errors, "task context output root does not match this project")
             if required_context_path(context, "task_output_dir") != output_dir:
                 fail(errors, "task context task output directory does not match validated directory")
-        except (json.JSONDecodeError, OSError, TypeError, ValueError) as exc:
+            verify_project_integrity(context, project_root, errors)
+        except (OSError, TypeError, ValueError) as exc:
             fail(errors, f"task_context.json is unreadable or invalid: {exc}")
 
     pages = sorted((output_dir / "render").glob("page-*.png"))
     if not pages:
         fail(errors, "no rendered page PNG files")
+    else:
+        warnings.extend(page_layout_warnings(pages))
 
     report_text = ""
     report_path = output_dir / "report.docx"
@@ -121,6 +187,7 @@ def main():
                 fail(errors, f"process optimization report section absent: {section}")
 
     summary_path = output_dir / "run_summary.md"
+    summary_text = summary_path.read_text(encoding="utf-8") if summary_path.is_file() else ""
     if summary_path.is_file() and report_path.is_file() and pages and optimization_path.is_file():
         newest_artifact = max(
             [
@@ -138,7 +205,13 @@ def main():
             print(f"- {error}")
         return 1
 
-    print(f"PORTABLE_AGENT_OUTPUT_OK pages={len(pages)} unique_urls={len(set(source_urls))}")
+    for warning in warnings:
+        print(f"PORTABLE_AGENT_OUTPUT_WARNING - {warning}")
+    status = declared_summary_status(summary_text)
+    print(
+        f"PORTABLE_AGENT_OUTPUT_OK pages={len(pages)} unique_urls={len(set(source_urls))} "
+        f"declared_status={status}"
+    )
     return 0
 
 

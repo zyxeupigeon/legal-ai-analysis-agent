@@ -14,8 +14,10 @@ SPEC.loader.exec_module(MODULE)
 def configure_project(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     project_root = tmp_path / "project-copy"
     project_root.mkdir()
+    (project_root / "PROJECT_AGENT_PROTOCOL.md").write_text("test protocol", encoding="utf-8")
     monkeypatch.setattr(MODULE, "PROJECT_ROOT", project_root)
     monkeypatch.setattr(MODULE, "OUTPUT_ROOT", project_root / "agent_outputs")
+    monkeypatch.setattr(MODULE, "PROTECTED_FIXED_PATHS", ("PROJECT_AGENT_PROTOCOL.md",))
     monkeypatch.chdir(project_root)
     monkeypatch.delenv("LEGAL_AI_PROJECT_ROOT", raising=False)
     return project_root
@@ -30,7 +32,8 @@ def test_task_workspace_is_anchored_to_current_project(monkeypatch, tmp_path):
     context = json.loads((output_dir / "task_context.json").read_text(encoding="utf-8"))
     assert Path(context["project_root"]) == project_root
     assert Path(context["task_output_dir"]) == output_dir
-    assert context["protocol_id"] == "portable-agent-0.4"
+    assert context["protocol_id"] == "portable-agent-0.5"
+    assert set(context["protected_project_hashes"]) == {"PROJECT_AGENT_PROTOCOL.md"}
 
 
 def test_wrong_current_directory_is_rejected(monkeypatch, tmp_path):

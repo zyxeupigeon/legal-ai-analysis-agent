@@ -1,7 +1,7 @@
 {
-  "profile_id": "p3-delifasou-regression-0.1",
+  "profile_id": "p3-delifasou-regression-0.2",
   "product_name": "得理法搜",
-  "required_report_label": "P3.0端到端测试稿",
+  "required_report_label": "得理法搜",
   "minimum_source_urls": 6,
   "required_source_domains": [
     "fgw.sz.gov.cn"

@@ -49,7 +49,7 @@ python scripts/create_task_workspace.py --task-id <本次唯一任务ID>
 - `render/report.pdf`
 - `render/page-*.png`
 
-只有确定性验收、独立逐页视觉检查和过程优化报告均完成时，运行摘要才能写总体PASS。Agent最终回复必须明确给出正式报告和过程优化报告的文件名及绝对路径。
+只有确定性验收、独立逐页视觉检查和过程优化报告均完成时，运行摘要才能写总体PASS。验收器输出结构性OK不代表总体PASS；以运行摘要声明的PASS、PARTIAL或FAIL为准。报告任务不得修改项目协议、脚本或验收配置。Agent最终回复必须明确给出正式报告和过程优化报告的文件名及绝对路径。
 
 ## 项目边界
 

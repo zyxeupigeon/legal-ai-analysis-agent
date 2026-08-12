@@ -62,7 +62,7 @@ Agent收到每个新会话的第一条消息后，必须先运行项目预检，
 - `render/report.pdf`
 - `render/page-*.png`
 
-只有确定性验收、最终逐页视觉检查和过程优化报告都完成时，`run_summary.md`才能写总体PASS。完成后，Agent必须在回复中明确列出 `report.docx` 与 `process_optimization_report.md` 的文件名和绝对路径。
+只有确定性验收、最终逐页视觉检查和过程优化报告都完成时，`run_summary.md`才能写总体PASS。验收器的结构性OK不等于总体PASS；报告任务也不得修改协议、脚本或验收配置。完成后，Agent必须在回复中明确列出 `report.docx` 与 `process_optimization_report.md` 的文件名和绝对路径。
 
 ## 正常停止情形
 

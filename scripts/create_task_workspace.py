@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -12,8 +13,37 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_ROOT = PROJECT_ROOT / "agent_outputs"
-PROTOCOL_ID = "portable-agent-0.4"
+PROTOCOL_ID = "portable-agent-0.5"
 TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
+PROTECTED_FIXED_PATHS = (
+    "PROJECT_AGENT_PROTOCOL.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "GEMINI.md",
+    "scripts/create_task_workspace.py",
+    "scripts/validate_portable_agent_output.py",
+)
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def protected_project_hashes() -> dict[str, str]:
+    relative_paths = list(PROTECTED_FIXED_PATHS)
+    evaluation_root = PROJECT_ROOT / "evaluations"
+    if evaluation_root.is_dir():
+        relative_paths.extend(
+            path.relative_to(PROJECT_ROOT).as_posix()
+            for path in sorted(evaluation_root.glob("*.json"))
+        )
+    hashes = {}
+    for relative_path in relative_paths:
+        path = PROJECT_ROOT / relative_path
+        if not path.is_file():
+            raise RuntimeError(f"protected project file is missing: {relative_path}")
+        hashes[relative_path] = file_sha256(path)
+    return hashes
 
 
 def verify_project_binding() -> None:
@@ -34,6 +64,7 @@ def allocate(task_id: str) -> Path:
     if not TASK_ID_PATTERN.fullmatch(task_id):
         raise ValueError("task id must use 1-80 ASCII letters, digits, underscores, or hyphens")
     verify_project_binding()
+    project_hashes = protected_project_hashes()
     output_dir = (OUTPUT_ROOT / task_id).resolve()
     if not output_dir.is_relative_to(OUTPUT_ROOT.resolve()):
         raise RuntimeError("task output path escaped agent_outputs")
@@ -44,6 +75,7 @@ def allocate(task_id: str) -> Path:
         "output_root": str(OUTPUT_ROOT.resolve()),
         "task_output_dir": str(output_dir),
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "protected_project_hashes": project_hashes,
     }
     (output_dir / "task_context.json").write_text(
         json.dumps(context, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -57,7 +89,7 @@ def main() -> None:
     args = parser.parse_args()
     try:
         output_dir = allocate(args.task_id)
-    except (FileExistsError, RuntimeError, ValueError) as exc:
+    except (FileExistsError, OSError, RuntimeError, ValueError) as exc:
         print("TASK_WORKSPACE_FAIL")
         print(f"- {exc}")
         raise SystemExit(1) from exc
