@@ -44,7 +44,7 @@ if (-not (Test-Path -LiteralPath $outputDirectory)) { New-Item -ItemType Directo
 $probePath = Join-Path $outputDirectory ".write_probe"
 $writePassed = $false
 try {
-    Set-Content -LiteralPath $probePath -Value "portable-agent-0.5" -Encoding UTF8
+    Set-Content -LiteralPath $probePath -Value "portable-agent-0.6" -Encoding UTF8
     $writePassed = Test-Path -LiteralPath $probePath -PathType Leaf
 } finally {
     if (Test-Path -LiteralPath $probePath) { Remove-Item -LiteralPath $probePath -Force }
@@ -113,7 +113,8 @@ if ($failedRequired.Count -gt 0) {
     exit 1
 }
 
-Write-Output "PREFLIGHT_BASE_OK protocol=portable-agent-0.5"
+Write-Output "PREFLIGHT_BASE_OK protocol=portable-agent-0.6"
+Write-Output "SESSION_GATE_REQUIRED declare READY only if the current conversation can continue normally without user decisions or restart"
 Write-Output ("LOCAL_DOCUMENT_PIPELINE_READY " + ($converterPassed -and ($null -ne $pageRendererPath)).ToString().ToLowerInvariant())
 Write-Output "TIP run START_AGENT.cmd -SelfTest before the first real analysis"
 Write-Output "NOTE internet search, page reading, model access, and visual document inspection must be declared by the running Agent; this local script cannot prove them."

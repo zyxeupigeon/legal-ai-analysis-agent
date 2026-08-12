@@ -19,8 +19,8 @@ frozen_files:
   workflow_sha256: "cdc56f3d285c94bbde54548d5efc91adbf184c2588db02bd684a172697dc6add"
 
 portable_agent:
-  protocol_version: "0.5"
-  protocol_id: "portable-agent-0.5"
+  protocol_version: "0.6"
+  protocol_id: "portable-agent-0.6"
   mode: "user_selected_local_agent"
   required_specific_agent: false
   required_specific_model: false
@@ -29,6 +29,7 @@ portable_agent:
   canonical_protocol: "PROJECT_AGENT_PROTOCOL.md"
   isolated_output_directory: "agent_outputs"
   task_workspace_allocator: "scripts/create_task_workspace.py"
+  session_gate: "required_ready_before_allocation"
   launcher_root_environment: "LEGAL_AI_PROJECT_ROOT"
   windows_launcher: "START_AGENT.cmd"
   self_test_command: "START_AGENT.cmd -SelfTest"

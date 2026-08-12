@@ -18,7 +18,7 @@
 
 .\START_AGENT.cmd
 
-5. Agent收到第一条消息后会先自动执行项目预检并报告结果，然后输入：
+5. Agent收到第一条消息后会先自动执行项目预检。只有显示SESSION_PREFLIGHT_READY才继续；若显示SESSION_PREFLIGHT_BLOCKED，不会生成报告，会告诉你需要确认、处理或重启的事项。然后输入：
 
 请完整读取项目协议，先创建绑定当前项目的任务目录，然后分析法律AI产品“得理法搜”，生成并质检Word报告。
 
@@ -31,7 +31,7 @@
 图形Agent必须能打开本地文件夹、运行命令、联网检索、读写文件和查看图片；普通聊天窗口不算。
 
 1. 在图形Agent中选择“打开文件夹”或“打开工作区”，选择本项目根目录。
-2. 输入：
+2. Agent先执行自检；只有显示SESSION_PREFLIGHT_READY才继续。若显示SESSION_PREFLIGHT_BLOCKED，按提示处理或重启，不会生成报告。然后输入：
 
 请把当前项目根目录作为工作区，完整读取PROJECT_AGENT_PROTOCOL.md及其要求的文件；核对绝对项目路径，运行SelfTest并创建唯一任务目录；通过后分析法律AI产品“得理法搜”，生成并质检Word报告。所有产物只写入分配器返回的绝对TASK_OUTPUT_DIR。
 

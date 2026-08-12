@@ -125,8 +125,10 @@ def main():
 
     if context:
         try:
-            if context.get("protocol_id") != "portable-agent-0.5":
-                fail(errors, "task context protocol id is not portable-agent-0.5")
+            if context.get("protocol_id") != "portable-agent-0.6":
+                fail(errors, "task context protocol id is not portable-agent-0.6")
+            if context.get("session_gate") != "READY":
+                fail(errors, "task context session gate is not READY")
             if required_context_path(context, "project_root") != project_root:
                 fail(errors, "task context project root does not match this project")
             if required_context_path(context, "output_root") != output_root:
