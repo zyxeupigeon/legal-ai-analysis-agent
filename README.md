@@ -2,7 +2,7 @@
 
 面向法律AI产品公开信息研究、证据核验、Word报告生成和逐页质检的便携式Agent工作目录。
 
-当前版本为P3.2用户试用版。项目不绑定特定Agent、模型、模型API、浏览器或MCP；使用者负责安装并登录一个具备所需能力的命令行或图形Agent。
+当前版本为P3.2用户试用版，GitHub仓库保持私有，通过手动发送ZIP分享。项目不绑定特定Agent、模型、模型API、浏览器或MCP；使用者负责安装并登录一个具备所需能力的命令行或图形Agent。
 
 ## Windows首次使用
 
@@ -20,7 +20,7 @@
 
 当前启动器可识别Claude Code、OpenCode、Codex CLI和Gemini CLI；已完成端到端验证的是Claude Code和OpenCode。
 
-进入Agent后输入：
+Agent收到新会话的第一条消息后，会先自动执行项目预检并报告结果，再处理消息。进入Agent后输入：
 
 ```text
 请完整读取项目协议，然后分析法律AI产品“得理法搜”，生成并质检Word报告。
@@ -45,10 +45,11 @@ python scripts/create_task_workspace.py --task-id <本次唯一任务ID>
 - `sources.md`
 - `capability_declaration.md`
 - `run_summary.md`
+- `process_optimization_report.md`（本次报告生成过程复盘和下一轮优化建议）
 - `render/report.pdf`
 - `render/page-*.png`
 
-只有确定性验收和独立逐页视觉检查均通过时，运行摘要才能写总体PASS。
+只有确定性验收、独立逐页视觉检查和过程优化报告均完成时，运行摘要才能写总体PASS。Agent最终回复必须明确给出正式报告和过程优化报告的文件名及绝对路径。
 
 ## 项目边界
 
