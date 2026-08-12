@@ -10,7 +10,7 @@ $RepoRoot = (Resolve-Path -LiteralPath (Split-Path -Parent $PSScriptRoot)).Path
 Set-Location $RepoRoot
 $env:LEGAL_AI_PROJECT_ROOT = $RepoRoot
 $env:LEGAL_AI_OUTPUT_ROOT = Join-Path $RepoRoot "agent_outputs"
-$env:LEGAL_AI_PROTOCOL_ID = "portable-agent-0.3"
+$env:LEGAL_AI_PROTOCOL_ID = "portable-agent-0.4"
 
 function Resolve-AgentLauncher([string]$Name) {
     $command = Get-Command $Name -ErrorAction SilentlyContinue

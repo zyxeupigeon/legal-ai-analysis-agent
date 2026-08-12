@@ -29,6 +29,8 @@
 .\START_AGENT.cmd -Agent opencode
 ```
 
+Agent收到每个新会话的第一条消息后，必须先运行项目预检，并在首次回复开头报告结果；预检通过后才会处理你的原始消息。
+
 ## 输入什么
 
 ```text
@@ -56,10 +58,11 @@
 - `sources.md`
 - `capability_declaration.md`
 - `run_summary.md`
+- `process_optimization_report.md`（记录真实耗时、工具、失败重试、瓶颈和下一轮优化建议）
 - `render/report.pdf`
 - `render/page-*.png`
 
-只有确定性验收和最终逐页视觉检查都通过时，`run_summary.md`才能写总体PASS。
+只有确定性验收、最终逐页视觉检查和过程优化报告都完成时，`run_summary.md`才能写总体PASS。完成后，Agent必须在回复中明确列出 `report.docx` 与 `process_optimization_report.md` 的文件名和绝对路径。
 
 ## 正常停止情形
 

@@ -51,6 +51,7 @@ def main():
         output_dir / "sources.md",
         output_dir / "run_summary.md",
         output_dir / "capability_declaration.md",
+        output_dir / "process_optimization_report.md",
         output_dir / "render" / "report.pdf",
     ]
     for path in required:
@@ -61,8 +62,8 @@ def main():
     if context_path.is_file():
         try:
             context = json.loads(context_path.read_text(encoding="utf-8"))
-            if context.get("protocol_id") != "portable-agent-0.3":
-                fail(errors, "task context protocol id is not portable-agent-0.3")
+            if context.get("protocol_id") != "portable-agent-0.4":
+                fail(errors, "task context protocol id is not portable-agent-0.4")
             if required_context_path(context, "project_root") != project_root:
                 fail(errors, "task context project root does not match this project")
             if required_context_path(context, "output_root") != output_root:
@@ -101,11 +102,35 @@ def main():
         if not re.search(pattern, evidence_text, flags=re.IGNORECASE):
             fail(errors, f"required evidence pattern absent: {pattern}")
 
+    optimization_path = output_dir / "process_optimization_report.md"
+    if optimization_path.is_file():
+        optimization_text = optimization_path.read_text(encoding="utf-8")
+        required_sections = [
+            "任务与结果概况",
+            "阶段记录与耗时",
+            "本次失败、重试与瓶颈",
+            "无效或重复步骤",
+            "质量风险与人工验收重点",
+            "可复用做法",
+            "下一轮优化建议",
+        ]
+        if len(optimization_text.strip()) < 300:
+            fail(errors, "process optimization report is too short")
+        for section in required_sections:
+            if section not in optimization_text:
+                fail(errors, f"process optimization report section absent: {section}")
+
     summary_path = output_dir / "run_summary.md"
-    if summary_path.is_file() and report_path.is_file() and pages:
-        newest_artifact = max([report_path.stat().st_mtime, *(p.stat().st_mtime for p in pages)])
+    if summary_path.is_file() and report_path.is_file() and pages and optimization_path.is_file():
+        newest_artifact = max(
+            [
+                report_path.stat().st_mtime,
+                optimization_path.stat().st_mtime,
+                *(p.stat().st_mtime for p in pages),
+            ]
+        )
         if summary_path.stat().st_mtime < newest_artifact:
-            fail(errors, "run_summary predates final report or rendered pages")
+            fail(errors, "run_summary predates final report, rendered pages, or optimization report")
 
     if errors:
         print("PORTABLE_AGENT_OUTPUT_FAIL")
