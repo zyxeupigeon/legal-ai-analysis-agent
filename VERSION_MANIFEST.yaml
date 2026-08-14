@@ -48,11 +48,16 @@ portable_agent:
   self_test_command: "START_AGENT.cmd -SelfTest"
   validated_hosts_for_protocol: "portable-agent-1.0"
   validated_hosts:
+    - "opencode_1.18.15_deepseek_chat_safe_stop"
+    - "codex_desktop_direct_image_gate_and_document_pipeline"
+  previously_validated_hosts_for_protocol_0_9:
     - "opencode_1.18.15_deepseek"
     - "claude_code_2.1.226_deepseek"
   automated_contract_validation: "passed"
-  end_to_end_report_validation: "pending_fresh_copy_regression_for_portable_agent_1.0"
+  fresh_github_zip_regression: "passed_no_git_copy"
+  end_to_end_report_validation: "pending_vision_capable_host_user_trial"
   safe_stop_automated_validation: "passed"
+  safe_stop_live_validation: "passed_opencode_deepseek_chat_no_task_created"
   user_trial_readiness: "ready_for_user_trial"
 
 data_policy:

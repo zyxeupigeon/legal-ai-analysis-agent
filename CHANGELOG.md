@@ -6,6 +6,7 @@
 - Added the canonical report renderer. It owns rendering trace events, records failures and retries, and writes only `report.docx`, `render/report.pdf`, and `render/page-*.png`.
 - Validation now rejects unmanifested duplicate DOCX/PDF/page images, requires failure observations for failed events, and normalizes URLs that touch CJK punctuation or prose.
 - Replaced the plain-text showcase guide with the Markdown showcase guide for clearer GitHub rendering and easier Agent consumption.
+- Verified the private GitHub ZIP as a no-Git fresh copy and confirmed live OpenCode/DeepSeek safe-stop behavior when image input is unavailable.
 
 
 ## 1.6.0 - 2026-08-14
