@@ -2,7 +2,7 @@
 
 面向法律AI产品公开信息研究、证据核验、Word报告生成和逐页质检的便携式Agent工作目录。
 
-当前版本为P3.4用户试用版，GitHub仓库保持私有，通过手动发送ZIP分享。项目不绑定特定Agent、模型、模型API、浏览器或MCP；使用者负责安装并登录一个具备所需能力的命令行或图形Agent。
+当前版本为P3.5用户试用版，GitHub仓库保持私有，通过手动发送ZIP分享。项目不绑定特定Agent、模型、模型API、浏览器或MCP；使用者负责安装并登录一个具备所需能力的命令行或图形Agent。
 
 ## Windows首次使用
 
@@ -38,6 +38,7 @@ python scripts/create_task_workspace.py --task-id <本次唯一任务ID> --sessi
 
 分配器还会自动初始化 `execution_trace.json`。Agent必须用 `scripts/record_execution_event.py` 记录阶段开始、结束、失败和重试；完成逐页质检后封存轨迹，再用 `scripts/build_process_optimization_report.py` 从真实记录生成优化报告。具体命令见 `docs/EXECUTION_TRACE_SCHEMA.md`。
 
+优化报告完成后，Agent会用 `scripts/compare_report_versions.py` 自动寻找同一产品最近的有效历史报告，生成机器可读和人类可读差异，再用 `scripts/build_report_manifest.py` 封存核心产物的大小和SHA-256。没有历史报告时会建立首次基线；详见 `docs/REPORT_VERSIONING.md`。
 
 ## 正常交付物
 
@@ -51,10 +52,12 @@ python scripts/create_task_workspace.py --task-id <本次唯一任务ID> --sessi
 - `capability_declaration.md`
 - `run_summary.md`
 - `process_optimization_report.md`（本次报告生成过程复盘和下一轮优化建议）
+- `report_diff.json`、`report_diff.md`（与同一产品最近有效报告的结构化和可读差异；首次运行建立基线）
+- `report_manifest.json`（核心产物路径、大小和SHA-256清单）
 - `render/report.pdf`
 - `render/page-*.png`
 
-只有确定性验收、独立逐页视觉检查和过程优化报告均完成时，运行摘要才能写总体PASS。验收器输出结构性OK不代表总体PASS；以运行摘要声明的PASS、PARTIAL或FAIL为准。报告任务不得修改项目协议、脚本或验收配置。Agent最终回复必须明确给出正式报告和过程优化报告的文件名及绝对路径。
+只有确定性验收、独立逐页视觉检查、过程优化报告、版本差异和产物清单均完成时，运行摘要才能写总体PASS。验收器输出结构性OK不代表总体PASS；以运行摘要声明的PASS、PARTIAL或FAIL为准。报告任务不得修改项目协议、脚本或验收配置。Agent最终回复必须明确给出正式报告、过程优化报告和人类可读版本差异的文件名及绝对路径。
 
 ## 项目边界
 
@@ -63,7 +66,7 @@ python scripts/create_task_workspace.py --task-id <本次唯一任务ID> --sessi
 - 输出是研究测试材料，不构成法律意见。
 - 网页应用、FastAPI后端及其运行依赖已从 `main` 移除；历史代码仍可从Git历史和 `archive/p2.3.4-web` 分支取得。
 
-详细步骤见 `docs/USER_TRIAL_GUIDE.md`，唯一业务协议见 `PROJECT_AGENT_PROTOCOL.md`。
+详细步骤见 `docs/USER_TRIAL_GUIDE.md`，版本管理规则见 `docs/REPORT_VERSIONING.md`，唯一业务协议见 `PROJECT_AGENT_PROTOCOL.md`。
 
 ## 开发检查
 

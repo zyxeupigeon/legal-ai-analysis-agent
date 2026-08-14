@@ -19,11 +19,11 @@ jobs:
         run: |
           set -euo pipefail
           git diff --check
-          for path in README.md PROJECT_STRUCTURE.md VERSION_MANIFEST.yaml CHANGELOG.md PROJECT_AGENT_PROTOCOL.md START_AGENT.cmd scripts/create_task_workspace.py scripts/check_agent_workspace.py scripts/self_test_document_pipeline.py scripts/start_agent.py scripts/execution_trace_lib.py scripts/record_execution_event.py scripts/build_process_optimization_report.py docs/EXECUTION_TRACE_SCHEMA.md docs/PROCESS_OPTIMIZATION_REPORT_TEMPLATE.md; do
+          for path in README.md PROJECT_STRUCTURE.md VERSION_MANIFEST.yaml CHANGELOG.md PROJECT_AGENT_PROTOCOL.md START_AGENT.cmd scripts/create_task_workspace.py scripts/check_agent_workspace.py scripts/self_test_document_pipeline.py scripts/start_agent.py scripts/execution_trace_lib.py scripts/record_execution_event.py scripts/build_process_optimization_report.py scripts/report_version_lib.py scripts/compare_report_versions.py scripts/build_report_manifest.py docs/EXECUTION_TRACE_SCHEMA.md docs/REPORT_VERSIONING.md docs/PROCESS_OPTIMIZATION_REPORT_TEMPLATE.md; do
             test -f "$path" || { echo "Missing $path"; exit 1; }
           done
-          grep -Fq 'project_phase: "P3.4"' VERSION_MANIFEST.yaml
-          grep -Fq 'protocol_id: "portable-agent-0.8"' VERSION_MANIFEST.yaml
+          grep -Fq 'project_phase: "P3.5"' VERSION_MANIFEST.yaml
+          grep -Fq 'protocol_id: "portable-agent-0.9"' VERSION_MANIFEST.yaml
           grep -Fq 'present_on_main: false' VERSION_MANIFEST.yaml
           test ! -d apps/web
           test ! -d services/api

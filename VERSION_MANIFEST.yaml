@@ -1,5 +1,5 @@
-manifest_version: "1.4"
-project_phase: "P3.4"
+manifest_version: "1.5"
+project_phase: "P3.5"
 release_channel: "user-trial"
 repository_visibility: "private"
 repository_owner_type: "personal"
@@ -19,8 +19,8 @@ frozen_files:
   workflow_sha256: "eab9919c5746c86babb04038bfa0ff2083cf16afceb748384f588e71ab49e6f4"
 
 portable_agent:
-  protocol_version: "0.8"
-  protocol_id: "portable-agent-0.8"
+  protocol_version: "0.9"
+  protocol_id: "portable-agent-0.9"
   mode: "user_selected_local_agent"
   required_specific_agent: false
   required_specific_model: false
@@ -34,6 +34,9 @@ portable_agent:
   execution_trace: "required_schema_1.0_finalized"
   optimization_report_source: "finalized_execution_trace_sha256_bound"
   execution_trace_security: "reject_secret_like_content"
+  report_version_diff: "required_schema_1.0"
+  report_manifest: "required_schema_1.0_sha256_bound"
+  comparison_baseline: "latest_same_subject_verified_manifest"
   repeating_table_headers: "required"
   launcher_root_environment: "LEGAL_AI_PROJECT_ROOT"
   windows_launcher: "START_AGENT.cmd"
@@ -45,7 +48,7 @@ portable_agent:
     - "opencode_1.18.15_deepseek"
     - "claude_code_2.1.226_deepseek"
   automated_contract_validation: "passed"
-  end_to_end_report_validation: "pending_user_trial_for_portable_agent_0.8"
+  end_to_end_report_validation: "pending_user_trial_for_portable_agent_0.9"
   safe_stop_automated_validation: "passed"
   user_trial_readiness: "ready_for_user_trial"
 

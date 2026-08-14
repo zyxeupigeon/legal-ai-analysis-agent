@@ -19,7 +19,7 @@ from execution_trace_lib import atomic_write_json, new_trace
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_ROOT = PROJECT_ROOT / "agent_outputs"
-PROTOCOL_ID = "portable-agent-0.8"
+PROTOCOL_ID = "portable-agent-0.9"
 TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
 PROTECTED_FIXED_PATHS = (
     "PROJECT_AGENT_PROTOCOL.md",
@@ -34,8 +34,12 @@ PROTECTED_FIXED_PATHS = (
     "scripts/execution_trace_lib.py",
     "scripts/record_execution_event.py",
     "scripts/build_process_optimization_report.py",
+    "scripts/report_version_lib.py",
+    "scripts/compare_report_versions.py",
+    "scripts/build_report_manifest.py",
     "docs/EXECUTION_TRACE_SCHEMA.md",
     "docs/PROCESS_OPTIMIZATION_REPORT_TEMPLATE.md",
+    "docs/REPORT_VERSIONING.md",
     "scripts/validate_portable_agent_output.py",
 )
 
