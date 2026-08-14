@@ -13,6 +13,8 @@ def test_every_agent_entry_requires_first_message_preflight_and_delivery_paths()
         assert "first user message of every new session" in text
         assert "Start the first reply with SESSION_PREFLIGHT_READY or SESSION_PREFLIGHT_BLOCKED" in text
         assert "process_optimization_report.md" in text
+        assert "execution_trace.json" in text
+        assert "finalized trace" in text
         assert "absolute path and filename" in text
 
 
@@ -22,13 +24,17 @@ def test_protocol_defines_optimization_report_contract() -> None:
         encoding="utf-8"
     )
 
-    assert "协议编号：portable-agent-0.7" in protocol
+    assert "协议编号：portable-agent-0.8" in protocol
     assert "新会话的第一项动作必须是项目预检" in protocol
     assert "SESSION_PREFLIGHT_READY" in protocol
     assert "SESSION_PREFLIGHT_BLOCKED" in protocol
     assert "不得运行任务目录分配器" in protocol
     assert "不得生成正式 Word" in protocol
     assert "process_optimization_report.md" in protocol
+    assert "execution_trace.json" in protocol
+    assert "docs/EXECUTION_TRACE_SCHEMA.md" in protocol
+    assert "scripts/record_execution_event.py finalize" in protocol
+    assert "scripts/build_process_optimization_report.py" in protocol
     assert "文件名和绝对路径" in protocol
     for section in (
         "任务与结果概况",
@@ -59,3 +65,4 @@ def test_validator_requires_process_optimization_report() -> None:
 
     assert result.returncode == 1
     assert "missing or empty: process_optimization_report.md" in result.stdout
+    assert "missing or empty: execution_trace.json" in result.stdout

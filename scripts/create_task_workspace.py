@@ -7,13 +7,19 @@ import hashlib
 import json
 import os
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+from execution_trace_lib import atomic_write_json, new_trace
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_ROOT = PROJECT_ROOT / "agent_outputs"
-PROTOCOL_ID = "portable-agent-0.7"
+PROTOCOL_ID = "portable-agent-0.8"
 TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
 PROTECTED_FIXED_PATHS = (
     "PROJECT_AGENT_PROTOCOL.md",
@@ -25,6 +31,11 @@ PROTECTED_FIXED_PATHS = (
     "scripts/check_agent_workspace.py",
     "scripts/start_agent.py",
     "scripts/create_task_workspace.py",
+    "scripts/execution_trace_lib.py",
+    "scripts/record_execution_event.py",
+    "scripts/build_process_optimization_report.py",
+    "docs/EXECUTION_TRACE_SCHEMA.md",
+    "docs/PROCESS_OPTIMIZATION_REPORT_TEMPLATE.md",
     "scripts/validate_portable_agent_output.py",
 )
 
@@ -77,18 +88,20 @@ def allocate(task_id: str, session_gate: str) -> Path:
     if not output_dir.is_relative_to(OUTPUT_ROOT.resolve()):
         raise RuntimeError("task output path escaped agent_outputs")
     output_dir.mkdir(parents=True, exist_ok=False)
+    created_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds")
     context = {
         "protocol_id": PROTOCOL_ID,
         "project_root": str(PROJECT_ROOT),
         "output_root": str(OUTPUT_ROOT.resolve()),
         "task_output_dir": str(output_dir),
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": created_at,
         "session_gate": session_gate,
         "protected_project_hashes": project_hashes,
     }
     (output_dir / "task_context.json").write_text(
         json.dumps(context, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+    atomic_write_json(output_dir / "execution_trace.json", new_trace(task_id, created_at))
     return output_dir
 
 
