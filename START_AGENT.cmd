@@ -1,4 +1,4 @@
 @echo off
 setlocal
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start_agent.ps1" %*
+python "%~dp0scripts\start_agent.py" %*
 exit /b %ERRORLEVEL%

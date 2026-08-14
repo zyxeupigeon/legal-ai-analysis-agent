@@ -2,11 +2,11 @@
 
 面向法律AI产品公开信息研究、证据核验、Word报告生成和逐页质检的便携式Agent工作目录。
 
-当前版本为P3.2用户试用版，GitHub仓库保持私有，通过手动发送ZIP分享。项目不绑定特定Agent、模型、模型API、浏览器或MCP；使用者负责安装并登录一个具备所需能力的命令行或图形Agent。
+当前版本为P3.3用户试用版，GitHub仓库保持私有，通过手动发送ZIP分享。项目不绑定特定Agent、模型、模型API、浏览器或MCP；使用者负责安装并登录一个具备所需能力的命令行或图形Agent。
 
 ## Windows首次使用
 
-在项目根目录打开PowerShell，先运行真实文档链路自检：
+在项目根目录打开PowerShell，先运行真实文档链路自检。启动器与预检器均使用 Python，不执行下载的未签名 `.ps1` 文件，因此不需要修改 PowerShell 执行策略或文件信任标记：
 
 ```powershell
 .\START_AGENT.cmd -SelfTest
@@ -43,6 +43,7 @@ python scripts/create_task_workspace.py --task-id <本次唯一任务ID> --sessi
 - `task_context.json`
 - `report.docx`
 - `sources.md`
+- `claim_evidence.json`（逐条主张、来源和正文位置的机器可验收账本）
 - `capability_declaration.md`
 - `run_summary.md`
 - `process_optimization_report.md`（本次报告生成过程复盘和下一轮优化建议）

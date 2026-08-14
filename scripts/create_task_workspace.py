@@ -13,13 +13,17 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_ROOT = PROJECT_ROOT / "agent_outputs"
-PROTOCOL_ID = "portable-agent-0.6"
+PROTOCOL_ID = "portable-agent-0.7"
 TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
 PROTECTED_FIXED_PATHS = (
     "PROJECT_AGENT_PROTOCOL.md",
     "AGENTS.md",
     "CLAUDE.md",
     "GEMINI.md",
+    "agent/core/v1.1/WORKFLOW.md",
+    "agent/skills/legal-report-review-and-verification/SKILL.md",
+    "scripts/check_agent_workspace.py",
+    "scripts/start_agent.py",
     "scripts/create_task_workspace.py",
     "scripts/validate_portable_agent_output.py",
 )

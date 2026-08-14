@@ -1,0 +1,18 @@
+{
+  "profile_version": "1.0",
+  "product_name": "通义法睿",
+  "as_of": "2026-08-14",
+  "required_report_label": "通义法睿",
+  "minimum_source_urls": 10,
+  "required_source_domains": [
+    "help.aliyun.com"
+  ],
+  "required_evidence_patterns": [
+    "通义法睿",
+    "farui-plus"
+  ],
+  "forbidden_report_patterns": [
+    "Qwen\\s*3\\.8"
+  ],
+  "notes": "真实试用回归：截至2026-08-14，官方当前Max文档为Qwen3.7，禁止把无来源的Qwen3.8写成当前事实。"
+}
