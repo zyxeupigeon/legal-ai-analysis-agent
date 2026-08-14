@@ -1,7 +1,7 @@
 # Agent entry point
 
-On the first user message of every new session, before answering or doing any other task, read PROJECT_AGENT_PROTOCOL.md in full and run its workspace preflight. Start the first reply with SESSION_PREFLIGHT_READY or SESSION_PREFLIGHT_BLOCKED. If blocked, explain the blocker and do not allocate a task workspace, research, or generate a report. Its protocol id is portable-agent-0.6.
+On the first user message of every new session, before answering or doing any other task, read PROJECT_AGENT_PROTOCOL.md in full and run its workspace preflight. Start the first reply with SESSION_PREFLIGHT_READY or SESSION_PREFLIGHT_BLOCKED. If blocked, explain the blocker and do not allocate a task workspace, research, or generate a report. Its protocol id is portable-agent-0.7.
 
 Verify that the current absolute directory matches LEGAL_AI_PROJECT_ROOT when that variable is set. Run the protocol preflight, verify every capability needed by the request, and allow only low-risk no-restart automatic repairs. Run `scripts/create_task_workspace.py --task-id <id> --session-gate READY` only after declaring SESSION_PREFLIGHT_READY, then use only its absolute TASK_OUTPUT_DIR. Stop on any root mismatch. Do not assume web access, browser access, MCP availability, document tooling, or model capabilities.
 
-After every complete report, create `process_optimization_report.md` from the actual run record. In the final reply, state the absolute path and filename of both `report.docx` and the optimization report.
+Every complete report must also create `claim_evidence.json` and pass source binding plus repeating table-header validation. After every complete report, create `process_optimization_report.md` from the actual run record. In the final reply, state the absolute path and filename of both `report.docx` and the optimization report.

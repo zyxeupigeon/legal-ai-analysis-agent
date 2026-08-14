@@ -8,6 +8,16 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+HTTP_URL = re.compile(r"^https?://", re.I)
+CLAIM_TYPES = {"verified_fact", "company_claim", "analysis", "unverified"}
+PRIMARY_SOURCE_CATEGORIES = {
+    "current_model_version",
+    "current_product_version",
+    "pricing",
+    "operator",
+    "policy_status",
+}
 
 def fail(errors, message):
     errors.append(message)
@@ -25,6 +35,88 @@ def docx_text(path):
         xml = archive.read("word/document.xml")
     root = ET.fromstring(xml)
     return "".join(node.text or "" for node in root.iter() if node.tag.endswith("}t"))
+
+
+def tables_without_repeating_headers(path):
+    with zipfile.ZipFile(path) as archive:
+        root = ET.fromstring(archive.read("word/document.xml"))
+    missing = []
+    for index, table in enumerate(root.findall(f".//{{{WORD_NS}}}tbl"), start=1):
+        first_row = table.find(f"{{{WORD_NS}}}tr")
+        row_properties = first_row.find(f"{{{WORD_NS}}}trPr") if first_row is not None else None
+        if row_properties is None or row_properties.find(f"{{{WORD_NS}}}tblHeader") is None:
+            missing.append(index)
+    return missing
+
+
+def validate_claim_evidence(path, source_urls, errors):
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        fail(errors, f"claim_evidence.json is unreadable or invalid: {exc}")
+        return 0
+    if not isinstance(payload, dict) or payload.get("schema_version") != "1.0":
+        fail(errors, "claim evidence schema_version must be 1.0")
+        return 0
+    claims = payload.get("claims")
+    if not isinstance(claims, list) or not claims:
+        fail(errors, "claim evidence must contain at least one claim")
+        return 0
+
+    claim_ids = set()
+    analysis_dependencies = []
+    normalized_sources = {url.rstrip(".,;，。；") for url in source_urls}
+    for index, claim in enumerate(claims):
+        label = f"claims[{index}]"
+        if not isinstance(claim, dict):
+            fail(errors, f"{label} must be an object")
+            continue
+        claim_id = claim.get("claim_id")
+        if not isinstance(claim_id, str) or not claim_id.strip():
+            fail(errors, f"{label}.claim_id is required")
+        elif claim_id in claim_ids:
+            fail(errors, f"duplicate claim id: {claim_id}")
+        else:
+            claim_ids.add(claim_id)
+        for key in ("claim_text", "category", "report_location"):
+            if not isinstance(claim.get(key), str) or not claim[key].strip():
+                fail(errors, f"{label}.{key} is required")
+        claim_type = claim.get("claim_type")
+        if claim_type not in CLAIM_TYPES:
+            fail(errors, f"{label}.claim_type must be one of {sorted(CLAIM_TYPES)}")
+        included = claim.get("included_in_report")
+        if not isinstance(included, bool):
+            fail(errors, f"{label}.included_in_report must be boolean")
+        if included and claim_type == "unverified":
+            fail(errors, f"{label} is unverified and cannot be included in report")
+
+        source_url = claim.get("source_url")
+        if claim_type in {"verified_fact", "company_claim"}:
+            if not isinstance(source_url, str) or not HTTP_URL.match(source_url):
+                fail(errors, f"{label}.source_url must be HTTP(S) for sourced claims")
+            elif source_url.rstrip(".,;，。；") not in normalized_sources:
+                fail(errors, f"{label}.source_url is absent from sources.md")
+            if claim.get("source_tier") not in {"A", "B", "C", "M"}:
+                fail(errors, f"{label}.source_tier must be A, B, C, or M")
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(claim.get("accessed_at", ""))):
+                fail(errors, f"{label}.accessed_at must use YYYY-MM-DD")
+
+        if included and claim.get("category") in PRIMARY_SOURCE_CATEGORIES:
+            if claim_type != "verified_fact" or claim.get("source_tier") != "A":
+                fail(errors, f"{label} requires a primary official source before report inclusion")
+
+        if claim_type == "analysis":
+            dependencies = claim.get("based_on_claim_ids")
+            if not isinstance(dependencies, list) or not dependencies:
+                fail(errors, f"{label}.based_on_claim_ids is required for analysis")
+            else:
+                analysis_dependencies.append((label, dependencies))
+
+    for label, dependencies in analysis_dependencies:
+        for dependency in dependencies:
+            if dependency not in claim_ids:
+                fail(errors, f"{label} references unknown claim id: {dependency}")
+    return len(claims)
 
 
 def required_context_path(context, key):
@@ -114,6 +206,7 @@ def main():
         output_dir / "task_context.json",
         output_dir / "report.docx",
         output_dir / "sources.md",
+        output_dir / "claim_evidence.json",
         output_dir / "run_summary.md",
         output_dir / "capability_declaration.md",
         output_dir / "process_optimization_report.md",
@@ -125,8 +218,8 @@ def main():
 
     if context:
         try:
-            if context.get("protocol_id") != "portable-agent-0.6":
-                fail(errors, "task context protocol id is not portable-agent-0.6")
+            if context.get("protocol_id") != "portable-agent-0.7":
+                fail(errors, "task context protocol id is not portable-agent-0.7")
             if context.get("session_gate") != "READY":
                 fail(errors, "task context session gate is not READY")
             if required_context_path(context, "project_root") != project_root:
@@ -150,6 +243,13 @@ def main():
     if report_path.is_file():
         try:
             report_text = docx_text(report_path)
+            missing_headers = tables_without_repeating_headers(report_path)
+            if missing_headers:
+                fail(
+                    errors,
+                    "DOCX table header row is not marked to repeat for table(s): "
+                    + ", ".join(str(index) for index in missing_headers),
+                )
         except Exception as exc:
             fail(errors, f"DOCX validation failed: {exc}")
 
@@ -162,6 +262,11 @@ def main():
     if len(set(source_urls)) < int(profile.get("minimum_source_urls", 1)):
         fail(errors, "source URL count is below profile minimum")
 
+    claim_count = 0
+    claim_evidence_path = output_dir / "claim_evidence.json"
+    if claim_evidence_path.is_file():
+        claim_count = validate_claim_evidence(claim_evidence_path, source_urls, errors)
+
     evidence_text = sources_text + "\n" + report_text
     for domain in profile.get("required_source_domains", []):
         if domain.lower() not in evidence_text.lower():
@@ -169,6 +274,9 @@ def main():
     for pattern in profile.get("required_evidence_patterns", []):
         if not re.search(pattern, evidence_text, flags=re.IGNORECASE):
             fail(errors, f"required evidence pattern absent: {pattern}")
+    for pattern in profile.get("forbidden_report_patterns", []):
+        if re.search(pattern, report_text, flags=re.IGNORECASE):
+            fail(errors, f"forbidden report pattern present: {pattern}")
 
     optimization_path = output_dir / "process_optimization_report.md"
     if optimization_path.is_file():
@@ -212,7 +320,7 @@ def main():
     status = declared_summary_status(summary_text)
     print(
         f"PORTABLE_AGENT_OUTPUT_OK pages={len(pages)} unique_urls={len(set(source_urls))} "
-        f"declared_status={status}"
+        f"claims={claim_count} declared_status={status}"
     )
     return 0
 

@@ -22,7 +22,7 @@ def test_protocol_defines_optimization_report_contract() -> None:
         encoding="utf-8"
     )
 
-    assert "协议编号：portable-agent-0.6" in protocol
+    assert "协议编号：portable-agent-0.7" in protocol
     assert "新会话的第一项动作必须是项目预检" in protocol
     assert "SESSION_PREFLIGHT_READY" in protocol
     assert "SESSION_PREFLIGHT_BLOCKED" in protocol

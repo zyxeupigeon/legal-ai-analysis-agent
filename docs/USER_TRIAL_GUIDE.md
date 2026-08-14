@@ -16,7 +16,7 @@
 .\START_AGENT.cmd -SelfTest
 ```
 
-自检会临时生成最小Word，将其转成PDF和逐页PNG，验证后自动清理。看到 `SELF_TEST_OK` 后运行：
+自检会临时生成最小Word，将其转成PDF和逐页PNG，验证后自动清理。整个启动与预检入口使用 Python，不执行项目中的下载 `.ps1` 文件；不要为本项目修改系统执行策略。看到 `SELF_TEST_OK` 后运行：
 
 ```powershell
 .\START_AGENT.cmd
@@ -56,6 +56,7 @@ Agent收到每个新会话的第一条消息后，必须先运行项目预检和
 - `task_context.json`
 - `report.docx`
 - `sources.md`
+- `claim_evidence.json`（逐条主张、来源和正文位置的证据账本）
 - `capability_declaration.md`
 - `run_summary.md`
 - `process_optimization_report.md`（记录真实耗时、工具、失败重试、瓶颈和下一轮优化建议）

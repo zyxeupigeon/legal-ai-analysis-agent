@@ -1,5 +1,5 @@
-manifest_version: "1.2"
-project_phase: "P3.2"
+manifest_version: "1.3"
+project_phase: "P3.3"
 release_channel: "user-trial"
 repository_visibility: "private"
 repository_owner_type: "personal"
@@ -12,15 +12,15 @@ baselines:
 skill:
   name: "legal-report-review-and-verification"
   pin_status: "vendored_and_hash_verified"
-  source_sha256: "b116c96ec1f756e9a9993f3e637fd6b8d44bf21094e85e59233e22517f2af84b"
+  source_sha256: "f7c502fa4908981276f1e0001fcc6b8572ad183a2c5848d9fd5acec33c5b72d4"
 
 frozen_files:
   system_prompt_sha256: "44d8e51e7016a7d431a95b3f67e1b519102caf996a3a319593191c6319a24596"
-  workflow_sha256: "cdc56f3d285c94bbde54548d5efc91adbf184c2588db02bd684a172697dc6add"
+  workflow_sha256: "eab9919c5746c86babb04038bfa0ff2083cf16afceb748384f588e71ab49e6f4"
 
 portable_agent:
-  protocol_version: "0.6"
-  protocol_id: "portable-agent-0.6"
+  protocol_version: "0.7"
+  protocol_id: "portable-agent-0.7"
   mode: "user_selected_local_agent"
   required_specific_agent: false
   required_specific_model: false
@@ -30,8 +30,12 @@ portable_agent:
   isolated_output_directory: "agent_outputs"
   task_workspace_allocator: "scripts/create_task_workspace.py"
   session_gate: "required_ready_before_allocation"
+  claim_evidence: "required_schema_1.0"
+  repeating_table_headers: "required"
   launcher_root_environment: "LEGAL_AI_PROJECT_ROOT"
   windows_launcher: "START_AGENT.cmd"
+  launcher_runtime: "python_no_downloaded_ps1"
+  preflight_command: "python scripts/check_agent_workspace.py"
   self_test_command: "START_AGENT.cmd -SelfTest"
   validated_hosts:
     - "opencode_1.18.15_deepseek"
