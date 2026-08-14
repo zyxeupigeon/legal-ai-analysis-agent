@@ -1,5 +1,14 @@
 # 变更记录
 
+## 1.7.0 - 2026-08-14
+
+- Upgraded to `portable-agent-1.0` / P3.6 with a one-use direct-image capability challenge and receipt-bound task allocation. Text-only or geometry-only inspection is now a hard BLOCKED condition.
+- Added the canonical report renderer. It owns rendering trace events, records failures and retries, and writes only `report.docx`, `render/report.pdf`, and `render/page-*.png`.
+- Validation now rejects unmanifested duplicate DOCX/PDF/page images, requires failure observations for failed events, and normalizes URLs that touch CJK punctuation or prose.
+- Replaced the plain-text showcase guide with the Markdown showcase guide for clearer GitHub rendering and easier Agent consumption.
+- Verified the private GitHub ZIP as a no-Git fresh copy and confirmed live OpenCode/DeepSeek safe-stop behavior when image input is unavailable.
+
+
 ## 1.6.0 - 2026-08-14
 
 - 协议升级为 `portable-agent-0.9`、项目阶段升级为P3.5；每份完整报告新增 `report_diff.json`、`report_diff.md` 和 `report_manifest.json`。

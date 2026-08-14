@@ -7,7 +7,7 @@
 运行以下命令后，任务分配器会同时创建 task_context.json 和 execution_trace.json，并自动写入 workspace_allocation 成功事件：
 
 ```powershell
-python scripts/create_task_workspace.py --task-id <唯一任务ID> --session-gate READY
+python scripts/create_task_workspace.py --task-id <唯一任务ID> --session-gate READY --capability-receipt "<CAPABILITY_RECEIPT>"
 ```
 
 不要手工新建、复制或修改轨迹文件。
@@ -76,3 +76,8 @@ python scripts/build_process_optimization_report.py "<TASK_OUTPUT_DIR>" --subjec
 - action、tool、note和观察字段不得写入令牌、API密钥、密码、Authorization头或其他认证信息。
 - artifacts只使用任务目录内的相对路径，不使用绝对路径或 ..。
 - execution_trace.json属于运行产物，受Git忽略规则保护，不得提交到仓库。
+
+
+## Canonical rendering and failures
+
+Use `python scripts/render_report.py "<TASK_OUTPUT_DIR>"` for the rendering stage. The renderer records and closes its own execution event. If conversion fails, it records a failed event and a `failure` observation before returning non-zero; a later invocation automatically links the retry to the latest failed or blocked rendering event. Finalization rejects failed or blocked events when no failure observation exists.

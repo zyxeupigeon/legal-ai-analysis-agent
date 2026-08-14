@@ -1,5 +1,5 @@
-manifest_version: "1.5"
-project_phase: "P3.5"
+manifest_version: "1.6"
+project_phase: "P3.6"
 release_channel: "user-trial"
 repository_visibility: "private"
 repository_owner_type: "personal"
@@ -19,8 +19,8 @@ frozen_files:
   workflow_sha256: "eab9919c5746c86babb04038bfa0ff2083cf16afceb748384f588e71ab49e6f4"
 
 portable_agent:
-  protocol_version: "0.9"
-  protocol_id: "portable-agent-0.9"
+  protocol_version: "1.0"
+  protocol_id: "portable-agent-1.0"
   mode: "user_selected_local_agent"
   required_specific_agent: false
   required_specific_model: false
@@ -30,6 +30,9 @@ portable_agent:
   isolated_output_directory: "agent_outputs"
   task_workspace_allocator: "scripts/create_task_workspace.py"
   session_gate: "required_ready_before_allocation"
+  capability_receipt: "one_use_visual_probe_and_required_capabilities"
+  canonical_renderer: "scripts/render_report.py"
+  unexpected_formal_artifacts: "rejected"
   claim_evidence: "required_schema_1.0"
   execution_trace: "required_schema_1.0_finalized"
   optimization_report_source: "finalized_execution_trace_sha256_bound"
@@ -43,13 +46,18 @@ portable_agent:
   launcher_runtime: "python_no_downloaded_ps1"
   preflight_command: "python scripts/check_agent_workspace.py"
   self_test_command: "START_AGENT.cmd -SelfTest"
-  validated_hosts_for_protocol: "portable-agent-0.7"
+  validated_hosts_for_protocol: "portable-agent-1.0"
   validated_hosts:
+    - "opencode_1.18.15_deepseek_chat_safe_stop"
+    - "codex_desktop_direct_image_gate_and_document_pipeline"
+  previously_validated_hosts_for_protocol_0_9:
     - "opencode_1.18.15_deepseek"
     - "claude_code_2.1.226_deepseek"
   automated_contract_validation: "passed"
-  end_to_end_report_validation: "pending_user_trial_for_portable_agent_0.9"
+  fresh_github_zip_regression: "passed_no_git_copy"
+  end_to_end_report_validation: "pending_vision_capable_host_user_trial"
   safe_stop_automated_validation: "passed"
+  safe_stop_live_validation: "passed_opencode_deepseek_chat_no_task_created"
   user_trial_readiness: "ready_for_user_trial"
 
 data_policy:

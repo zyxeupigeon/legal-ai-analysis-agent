@@ -1,6 +1,6 @@
 # 法律AI产品分析项目 Agent 协议
 
-协议编号：portable-agent-0.9
+协议编号：portable-agent-1.0
 
 ## 目的
 
@@ -21,7 +21,7 @@
 9. 完整阅读 `agent/core/v1.1/SYSTEM_PROMPT.md`、`agent/core/v1.1/WORKFLOW.md` 和目标任务涉及的 Skill。涉及寻找、比较、采用或替换开源项目时，还必须完整阅读 `OPEN_SOURCE_DISCOVERY_PROTOCOL.md`。
 10. 只有声明 `SESSION_PREFLIGHT_READY` 后，才可在写入任何任务文件前运行：
 
-   `python scripts/create_task_workspace.py --task-id <本次唯一任务ID> --session-gate READY`
+   `python scripts/create_task_workspace.py --task-id <本次唯一任务ID> --session-gate READY --capability-receipt "<CAPABILITY_RECEIPT>"`
 
 11. 只有看到 `TASK_WORKSPACE_OK` 后才能继续，并且必须把其返回的绝对 `TASK_OUTPUT_DIR` 作为本次唯一写入目录。若闸门不是 READY、任务目录已存在、当前目录不正确或根目录绑定不一致，分配器会失败；此时必须停止并向使用者报告，不得改写到另一位置。
 
@@ -95,3 +95,13 @@ Agent不得仅根据自身执行计划或工具返回值宣称任务通过。必
 7. 最后更新运行摘要，使其修改时间晚于最终Word、全部渲染页、过程优化报告和产物清单，并使PASS、PARTIAL或FAIL与清单一致。
 8. 运行项目提供的确定性输出验收器；有测试对象配置时必须加载对应profile。验收器的结构性 `OK` 不等同于总体 `PASS`，最终状态以运行摘要中如实声明的 PASS、PARTIAL 或 FAIL 为准。
 9. 只有确定性验收、独立视觉检查、过程优化报告、版本差异和产物清单均完成，运行摘要才可写总体PASS；否则必须写FAIL或PARTIAL并列出缺口。
+
+## Portable-agent 1.0 hard gates
+
+1. Before declaring `SESSION_PREFLIGHT_READY`, run `python scripts/session_preflight_gate.py prepare`. Open the emitted `PROBE_IMAGE` with the same direct image-view capability that will be used for final report pages. Do not obtain the code from OCR, PDF geometry, source files, hashes, or another model.
+2. After direct image inspection and real tests of internet search plus full-page reading, run `python scripts/session_preflight_gate.py verify --challenge-id <CHALLENGE_ID> --visual-code <SIX_DIGIT_CODE> --internet-search READY --page-reading READY --word-generation READY --pdf-png-rendering READY`. A successful command emits a one-use `CAPABILITY_RECEIPT`.
+3. If direct image inspection, full-page reading, authentication, permissions, or any other required capability is unavailable in the current continuous session, declare `SESSION_PREFLIGHT_BLOCKED`. Geometry-only PDF checks are not a substitute for direct final-page inspection and must not be used to declare READY or PASS.
+4. Task allocation requires the one-use capability receipt. A receipt from another project copy, an expired receipt, or a consumed receipt must be rejected.
+5. Generate the editable report directly as `<TASK_OUTPUT_DIR>/report.docx`. Render it only with `python scripts/render_report.py "<TASK_OUTPUT_DIR>"`; this command owns the rendering execution event, records failures, links retries, and writes only `render/report.pdf` plus `render/page-*.png`.
+6. Every failed or blocked execution attempt must be closed immediately with its real status before retrying. A finalized trace containing a failed or blocked event must include a `failure` observation, so the process optimization report cannot state that no failure occurred.
+7. Do not leave alternate `.docx`, `.pdf`, or root-level `page-*.png` copies in the task directory. The manifest and final validator reject unmanifested formal duplicates.

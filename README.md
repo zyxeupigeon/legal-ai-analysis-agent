@@ -2,7 +2,7 @@
 
 面向法律AI产品公开信息研究、证据核验、Word报告生成和逐页质检的便携式Agent工作目录。
 
-当前版本为P3.5用户试用版，GitHub仓库保持私有，通过手动发送ZIP分享。项目不绑定特定Agent、模型、模型API、浏览器或MCP；使用者负责安装并登录一个具备所需能力的命令行或图形Agent。
+当前版本为P3.6用户试用版，GitHub仓库保持私有，通过手动发送ZIP分享。项目不绑定特定Agent、模型、模型API、浏览器或MCP；使用者负责安装并登录一个具备所需能力的命令行或图形Agent。
 
 ## Windows首次使用
 
@@ -20,6 +20,8 @@
 
 当前启动器可识别Claude Code、OpenCode、Codex CLI和Gemini CLI；已完成端到端验证的是Claude Code和OpenCode。
 
+> Portable-agent 1.0 requires a one-use direct-image capability probe before task allocation. A text-only Agent must return `SESSION_PREFLIGHT_BLOCKED` before report generation.
+
 Agent收到新会话的第一条消息后，会先自动执行项目预检和能力闸门。只有回复 `SESSION_PREFLIGHT_READY` 才会继续；若回复 `SESSION_PREFLIGHT_BLOCKED`，不会生成报告，而会说明需要你确认、处理或重启的事项。进入Agent后输入：
 
 ```text
@@ -31,10 +33,12 @@ Agent收到新会话的第一条消息后，会先自动执行项目预检和能
 启动器会把当前项目的绝对路径写入 `LEGAL_AI_PROJECT_ROOT`。Agent在写入任何任务文件前必须运行：
 
 ```powershell
-python scripts/create_task_workspace.py --task-id <本次唯一任务ID> --session-gate READY
+python scripts/create_task_workspace.py --task-id <本次唯一任务ID> --session-gate READY --capability-receipt "<CAPABILITY_RECEIPT>"
 ```
 
 只有返回 `TASK_WORKSPACE_OK` 后才能继续，全部产物必须写入返回的绝对 `TASK_OUTPUT_DIR`。若Agent复用了另一份项目副本、旧会话或错误工作目录，分配器会停止任务，避免报告写到同级旧项目。
+
+After the receipt is issued, generate the formal file directly as `report.docx` and run `python scripts/render_report.py "<TASK_OUTPUT_DIR>"`. The canonical renderer records rendering failures and retries and writes only `render/report.pdf` plus `render/page-*.png`.
 
 分配器还会自动初始化 `execution_trace.json`。Agent必须用 `scripts/record_execution_event.py` 记录阶段开始、结束、失败和重试；完成逐页质检后封存轨迹，再用 `scripts/build_process_optimization_report.py` 从真实记录生成优化报告。具体命令见 `docs/EXECUTION_TRACE_SCHEMA.md`。
 
@@ -65,6 +69,8 @@ python scripts/create_task_workspace.py --task-id <本次唯一任务ID> --sessi
 - 不把密钥、账号、客户资料、参考报告或运行产物提交到Git。
 - 输出是研究测试材料，不构成法律意见。
 - 网页应用、FastAPI后端及其运行依赖已从 `main` 移除；历史代码仍可从Git历史和 `archive/p2.3.4-web` 分支取得。
+
+Quick display and usage guide: [`项目成果展示与使用说明.md`](项目成果展示与使用说明.md).
 
 详细步骤见 `docs/USER_TRIAL_GUIDE.md`，版本管理规则见 `docs/REPORT_VERSIONING.md`，唯一业务协议见 `PROJECT_AGENT_PROTOCOL.md`。
 

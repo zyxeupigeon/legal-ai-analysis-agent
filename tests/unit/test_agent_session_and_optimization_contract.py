@@ -26,10 +26,14 @@ def test_protocol_defines_optimization_report_contract() -> None:
         encoding="utf-8"
     )
 
-    assert "协议编号：portable-agent-0.9" in protocol
+    assert "协议编号：portable-agent-1.0" in protocol
     assert "新会话的第一项动作必须是项目预检" in protocol
     assert "SESSION_PREFLIGHT_READY" in protocol
     assert "SESSION_PREFLIGHT_BLOCKED" in protocol
+    assert "session_preflight_gate.py prepare" in protocol
+    assert "CAPABILITY_RECEIPT" in protocol
+    assert "scripts/render_report.py" in protocol
+    assert "unmanifested formal duplicates" in protocol
     assert "不得运行任务目录分配器" in protocol
     assert "不得生成正式 Word" in protocol
     assert "process_optimization_report.md" in protocol

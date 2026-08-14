@@ -12,7 +12,14 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from execution_trace_lib import trace_sha256, validate_trace
-from report_version_lib import validate_diff, validate_manifest
+from report_version_lib import (
+    PROTOCOL_ID,
+    extract_urls_from_text,
+    normalize_source_url,
+    validate_diff,
+    validate_manifest,
+    validate_session_capability_context,
+)
 
 
 WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -72,7 +79,7 @@ def validate_claim_evidence(path, source_urls, errors):
 
     claim_ids = set()
     analysis_dependencies = []
-    normalized_sources = {url.rstrip(".,;，。；") for url in source_urls}
+    normalized_sources = set(source_urls)
     for index, claim in enumerate(claims):
         label = f"claims[{index}]"
         if not isinstance(claim, dict):
@@ -101,7 +108,7 @@ def validate_claim_evidence(path, source_urls, errors):
         if claim_type in {"verified_fact", "company_claim"}:
             if not isinstance(source_url, str) or not HTTP_URL.match(source_url):
                 fail(errors, f"{label}.source_url must be HTTP(S) for sourced claims")
-            elif source_url.rstrip(".,;，。；") not in normalized_sources:
+            elif normalize_source_url(source_url) not in normalized_sources:
                 fail(errors, f"{label}.source_url is absent from sources.md")
             if claim.get("source_tier") not in {"A", "B", "C", "M"}:
                 fail(errors, f"{label}.source_tier must be A, B, C, or M")
@@ -229,10 +236,12 @@ def main():
 
     if context:
         try:
-            if context.get("protocol_id") != "portable-agent-0.9":
-                fail(errors, "task context protocol id is not portable-agent-0.9")
+            if context.get("protocol_id") != PROTOCOL_ID:
+                fail(errors, f"task context protocol id is not {PROTOCOL_ID}")
             if context.get("session_gate") != "READY":
                 fail(errors, "task context session gate is not READY")
+            for capability_error in validate_session_capability_context(context):
+                fail(errors, capability_error)
             if required_context_path(context, "project_root") != project_root:
                 fail(errors, "task context project root does not match this project")
             if required_context_path(context, "output_root") != output_root:
@@ -285,7 +294,7 @@ def main():
 
     sources_path = output_dir / "sources.md"
     sources_text = sources_path.read_text(encoding="utf-8") if sources_path.is_file() else ""
-    source_urls = re.findall(r"https?://[^\s|)>]+", sources_text)
+    source_urls = extract_urls_from_text(sources_text)
     if len(set(source_urls)) < int(profile.get("minimum_source_urls", 1)):
         fail(errors, "source URL count is below profile minimum")
 

@@ -59,3 +59,8 @@ python scripts/build_report_manifest.py "<TASK_OUTPUT_DIR>" --subject "<法律AI
 - 不读取当前项目外的历史报告，不复制网页正文，也不保存登录或付费内容。
 - 旧报告清单校验失败时直接跳过，不用未验证的历史内容参与比较。
 - 版本差异是研究变化提示，不构成法律意见或自动事实确认。
+
+
+## Canonical formal artifacts
+
+Source URLs are normalized before comparison: trailing CJK punctuation and prose are not part of a URL. A completed task may contain only the canonical Word file `report.docx`, canonical PDF `render/report.pdf`, and canonical page images `render/page-*.png`. Any alternate DOCX/PDF or misplaced root-level page image is an unmanifested formal duplicate and causes validation to fail.

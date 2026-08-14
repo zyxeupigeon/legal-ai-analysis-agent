@@ -44,7 +44,7 @@ Agent收到每个新会话的第一条消息后，必须先运行项目预检和
 启动器会显示 `Project root` 和 `Output root`。Agent必须：
 
 1. 确认当前绝对目录与 `LEGAL_AI_PROJECT_ROOT` 相同；
-2. 运行 `python scripts/create_task_workspace.py --task-id <唯一任务ID> --session-gate READY`；
+2. 运行 `python scripts/create_task_workspace.py --task-id <唯一任务ID> --session-gate READY --capability-receipt "<CAPABILITY_RECEIPT>"`；
 3. 只向返回的绝对 `TASK_OUTPUT_DIR` 写文件。
 
 4. 任务目录会自动包含 `execution_trace.json`；Agent必须按 `docs/EXECUTION_TRACE_SCHEMA.md` 记录并闭合各阶段，完成逐页质检后封存轨迹，再自动生成过程优化报告。
@@ -75,3 +75,8 @@ Agent收到每个新会话的第一条消息后，必须先运行项目预检和
 ## 正常停止情形
 
 若自检发现缺少联网或正文读取能力、无法生成Word/PDF/页面图片、无法视觉检查、根目录绑定不一致，或修复需要你确认、安装、授权、登录或重启，Agent必须在生成报告前停止并报告 BLOCKED，不得凭模型记忆补写或生成PARTIAL报告。进入研究后才出现的证据不足，按协议缩减、停止或如实处理。
+
+
+## Portable-agent 1.0 capability gate
+
+Before task allocation, run `python scripts/session_preflight_gate.py prepare`, directly inspect the generated PNG challenge, and run `verify` with all five required capabilities declared READY. Use the returned one-use receipt in `create_task_workspace.py`. A text-only Agent, OCR-only check, missing browser access, missing document pipeline, or any repair that needs approval/restart must stop with `SESSION_PREFLIGHT_BLOCKED` and must not create a report. Generate only `report.docx`, then use `python scripts/render_report.py "<TASK_OUTPUT_DIR>"`; the canonical PDF and page images are written under `render/`.

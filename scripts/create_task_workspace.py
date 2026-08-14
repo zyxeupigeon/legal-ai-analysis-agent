@@ -15,11 +15,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from execution_trace_lib import atomic_write_json, new_trace
+from session_preflight_gate import consume_capability_receipt, validate_capability_receipt
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_ROOT = PROJECT_ROOT / "agent_outputs"
-PROTOCOL_ID = "portable-agent-0.9"
+PROTOCOL_ID = "portable-agent-1.0"
 TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
 PROTECTED_FIXED_PATHS = (
     "PROJECT_AGENT_PROTOCOL.md",
@@ -29,6 +30,7 @@ PROTECTED_FIXED_PATHS = (
     "agent/core/v1.1/WORKFLOW.md",
     "agent/skills/legal-report-review-and-verification/SKILL.md",
     "scripts/check_agent_workspace.py",
+    "scripts/session_preflight_gate.py",
     "scripts/start_agent.py",
     "scripts/create_task_workspace.py",
     "scripts/execution_trace_lib.py",
@@ -37,6 +39,9 @@ PROTECTED_FIXED_PATHS = (
     "scripts/report_version_lib.py",
     "scripts/compare_report_versions.py",
     "scripts/build_report_manifest.py",
+    "scripts/render_report.py",
+    "scripts/self_test_document_pipeline.py",
+    "scripts/create_self_test_docx.py",
     "docs/EXECUTION_TRACE_SCHEMA.md",
     "docs/PROCESS_OPTIMIZATION_REPORT_TEMPLATE.md",
     "docs/REPORT_VERSIONING.md",
@@ -79,7 +84,7 @@ def verify_project_binding() -> None:
         )
 
 
-def allocate(task_id: str, session_gate: str) -> Path:
+def allocate(task_id: str, session_gate: str, capability_receipt: Path) -> Path:
     if not TASK_ID_PATTERN.fullmatch(task_id):
         raise ValueError("task id must use 1-80 ASCII letters, digits, underscores, or hyphens")
     if session_gate != "READY":
@@ -87,6 +92,7 @@ def allocate(task_id: str, session_gate: str) -> Path:
             "session preflight is not READY; do not create a task workspace or generate a report"
         )
     verify_project_binding()
+    receipt = validate_capability_receipt(capability_receipt, PROJECT_ROOT)
     project_hashes = protected_project_hashes()
     output_dir = (OUTPUT_ROOT / task_id).resolve()
     if not output_dir.is_relative_to(OUTPUT_ROOT.resolve()):
@@ -100,12 +106,17 @@ def allocate(task_id: str, session_gate: str) -> Path:
         "task_output_dir": str(output_dir),
         "created_at": created_at,
         "session_gate": session_gate,
+        "session_capability_receipt_id": receipt["receipt_id"],
+        "session_capabilities": receipt["capabilities"],
+        "visual_probe_verified": receipt["visual_probe_verified"],
+        "document_self_test": receipt["document_self_test"],
         "protected_project_hashes": project_hashes,
     }
     (output_dir / "task_context.json").write_text(
         json.dumps(context, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     atomic_write_json(output_dir / "execution_trace.json", new_trace(task_id, created_at))
+    consume_capability_receipt(capability_receipt, task_id, PROJECT_ROOT)
     return output_dir
 
 
@@ -113,9 +124,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--task-id", required=True)
     parser.add_argument("--session-gate", required=True, choices=("READY", "BLOCKED"))
+    parser.add_argument("--capability-receipt", required=True, type=Path)
     args = parser.parse_args()
     try:
-        output_dir = allocate(args.task_id, args.session_gate)
+        output_dir = allocate(args.task_id, args.session_gate, args.capability_receipt)
     except (FileExistsError, OSError, RuntimeError, ValueError) as exc:
         print("TASK_WORKSPACE_FAIL")
         print(f"- {exc}")
