@@ -8,7 +8,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-PROTOCOL_ID = "portable-agent-0.9"
+PROTOCOL_ID = "portable-agent-1.0"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -39,13 +39,11 @@ def find_libreoffice() -> str | None:
 
 
 def find_pdf_renderer() -> str | None:
-    command = shutil.which("pdftoppm")
-    if command:
-        return command
     for module_name in ("pymupdf", "fitz"):
         if importlib.util.find_spec(module_name) is not None:
             return f"Python module: {module_name}"
-    return None
+    command = shutil.which("pdftoppm")
+    return command
 
 
 def main() -> int:
@@ -68,6 +66,8 @@ def main() -> int:
         "agent/core/v1.1/WORKFLOW.md",
         "agent/skills/legal-report-review-and-verification/SKILL.md",
         "scripts/create_task_workspace.py",
+        "scripts/session_preflight_gate.py",
+        "scripts/render_report.py",
         "scripts/execution_trace_lib.py",
         "scripts/record_execution_event.py",
         "scripts/build_process_optimization_report.py",

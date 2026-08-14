@@ -38,12 +38,41 @@ def write_minimal_docx(path: Path) -> None:
         archive.writestr("word/document.xml", document_xml)
 
 
+def write_capability_receipt() -> Path:
+    receipt_dir = REPO_ROOT / "tmp" / "session_preflight" / "receipts"
+    receipt_dir.mkdir(parents=True, exist_ok=True)
+    receipt_id = uuid.uuid4().hex
+    path = receipt_dir / f"{receipt_id}.json"
+    path.write_text(json.dumps({
+        "schema_version": "1.0",
+        "protocol_id": "portable-agent-1.0",
+        "receipt_id": receipt_id,
+        "challenge_id": "unit-test",
+        "project_root": str(REPO_ROOT.resolve()),
+        "created_at": "2026-08-14T00:00:00.000+00:00",
+        "expires_at": "2099-08-14T00:00:00.000+00:00",
+        "used_at": None,
+        "used_for_task_id": None,
+        "visual_probe_verified": True,
+        "document_self_test": "READY",
+        "capabilities": {
+            "internet_search": "READY",
+            "page_reading": "READY",
+            "word_generation": "READY",
+            "pdf_png_rendering": "READY",
+            "direct_image_inspection": "READY",
+        },
+    }, indent=2), encoding="utf-8")
+    return path
+
+
 def test_complete_cli_output_passes_then_tampering_is_rejected() -> None:
     unique = uuid.uuid4().hex[:12]
     task_id = f"contract_{unique}"
     task_dir = REPO_ROOT / "agent_outputs" / task_id
     subject = f"完整验收测试产品-{unique}"
     source_url = f"https://official.example/{unique}/pricing"
+    receipt_path = write_capability_receipt()
     try:
         result = run_script(
             "scripts/create_task_workspace.py",
@@ -51,6 +80,8 @@ def test_complete_cli_output_passes_then_tampering_is_rejected() -> None:
             task_id,
             "--session-gate",
             "READY",
+            "--capability-receipt",
+            str(receipt_path),
         )
         assert result.returncode == 0, result.stdout + result.stderr
 
@@ -126,3 +157,5 @@ def test_complete_cli_output_passes_then_tampering_is_rejected() -> None:
     finally:
         if task_dir.is_dir() and task_dir.resolve().parent == (REPO_ROOT / "agent_outputs").resolve():
             shutil.rmtree(task_dir)
+        if receipt_path.is_file():
+            receipt_path.unlink()

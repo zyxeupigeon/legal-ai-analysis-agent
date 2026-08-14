@@ -12,7 +12,7 @@ SCRIPTS = REPO_ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from execution_trace_lib import REQUIRED_REPORT_STAGES, new_trace, validate_trace
-from report_version_lib import subject_key, validate_manifest
+from report_version_lib import extract_urls_from_text, subject_key, validate_manifest
 
 
 def load_module(name: str, filename: str):
@@ -87,12 +87,22 @@ def create_task(
     task_dir = output_root / task_id
     (task_dir / "render").mkdir(parents=True)
     context = {
-        "protocol_id": "portable-agent-0.9",
+        "protocol_id": "portable-agent-1.0",
         "project_root": str(project_root.resolve()),
         "output_root": str(output_root.resolve()),
         "task_output_dir": str(task_dir.resolve()),
         "created_at": "2026-08-14T00:00:00.000+00:00",
         "session_gate": "READY",
+        "session_capability_receipt_id": "synthetic-test-receipt",
+        "visual_probe_verified": True,
+        "document_self_test": "READY",
+        "session_capabilities": {
+            "internet_search": "READY",
+            "page_reading": "READY",
+            "word_generation": "READY",
+            "pdf_png_rendering": "READY",
+            "direct_image_inspection": "READY",
+        },
         "protected_project_hashes": {"PROJECT_AGENT_PROTOCOL.md": "test"},
     }
     (task_dir / "task_context.json").write_text(
@@ -278,3 +288,34 @@ def test_diff_rejects_blocked_context_and_mismatched_claim_task_id(tmp_path: Pat
         assert "task_id must match task directory" in str(exc)
     else:
         raise AssertionError("mismatched claim task id was accepted")
+
+def test_url_extraction_stops_at_cjk_punctuation_and_brackets() -> None:
+    text = (
+        "https://dashscope.aliyuncs.com/compatible-mode/v1\uFF09 "
+        "https://tongyi.aliyun.com/farui/\uFF1B\u529F\u80FD\u5305\u62EC "
+        "https://official.example/path?x=1&y=2."
+    )
+    assert extract_urls_from_text(text) == [
+        "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "https://official.example/path?x=1&y=2",
+        "https://tongyi.aliyun.com/farui/",
+    ]
+
+
+def test_manifest_rejects_unmanifested_formal_duplicates(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    task_dir = create_task(
+        project_root,
+        "duplicates_20260814",
+        price="official price",
+        source_url="https://official.example/pricing",
+    )
+    DIFF.build_diff(task_dir, "test legal AI", project_root)
+    MANIFEST.build_manifest(task_dir, "test legal AI", "PASS", project_root)
+
+    (task_dir / "alternate-name.docx").write_bytes(b"duplicate")
+    (task_dir / "alternate-name.pdf").write_bytes(b"duplicate")
+    errors = validate_manifest(task_dir)
+    assert "unexpected unmanifested formal artifact: alternate-name.docx" in errors
+    assert "unexpected unmanifested formal artifact: alternate-name.pdf" in errors

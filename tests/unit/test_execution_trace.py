@@ -204,3 +204,79 @@ def test_recorder_rejects_task_directory_outside_current_project(
     atomic_write_json(outside / "execution_trace.json", new_trace(outside.name))
     with pytest.raises(ValueError, match="outside this project agent_outputs"):
         RECORDER.load_bound_trace(outside)
+
+def test_finalized_trace_requires_failure_observation_for_failed_attempts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output_dir = task_dir(tmp_path, monkeypatch)
+    failed_event_id = None
+    for stage in (
+        "target_scoping",
+        "research",
+        "evidence_analysis",
+        "report_generation",
+        "rendering",
+        "visual_qa",
+    ):
+        event_id = RECORDER.start_event(argparse.Namespace(
+            task_dir=output_dir,
+            stage=stage,
+            action=f"Complete {stage}",
+            tool="test-tool",
+            retry_of=None,
+        ))
+        status = "failed" if stage == "rendering" else "succeeded"
+        RECORDER.finish_event(argparse.Namespace(
+            task_dir=output_dir,
+            event_id=event_id,
+            status=status,
+            note="Synthetic renderer failure" if status == "failed" else None,
+            artifact=None,
+        ))
+        if status == "failed":
+            failed_event_id = event_id
+            retry_id = RECORDER.start_event(argparse.Namespace(
+                task_dir=output_dir,
+                stage="rendering",
+                action="Retry rendering",
+                tool="test-tool",
+                retry_of=failed_event_id,
+            ))
+            RECORDER.finish_event(argparse.Namespace(
+                task_dir=output_dir,
+                event_id=retry_id,
+                status="succeeded",
+                note=None,
+                artifact=None,
+            ))
+    RECORDER.add_observation(argparse.Namespace(
+        task_dir=output_dir,
+        stage="visual_qa",
+        kind="optimization_recommendation",
+        summary="Keep failure records complete",
+        impact="Optimization reports remain truthful",
+        resolution=None,
+        priority="P0",
+        expected_benefit="No omitted retries",
+        implementation_cost="Low",
+        risk="More trace entries",
+        validation_method="Finalize a trace with a failed render attempt",
+    ))
+
+    with pytest.raises(ValueError, match="failure observation"):
+        RECORDER.finalize_trace(argparse.Namespace(task_dir=output_dir))
+
+    RECORDER.add_observation(argparse.Namespace(
+        task_dir=output_dir,
+        stage="rendering",
+        kind="failure",
+        summary="The first render attempt failed",
+        impact="A retry was required",
+        resolution="Used the canonical renderer",
+        priority=None,
+        expected_benefit=None,
+        implementation_cost=None,
+        risk=None,
+        validation_method=None,
+    ))
+    RECORDER.finalize_trace(argparse.Namespace(task_dir=output_dir))

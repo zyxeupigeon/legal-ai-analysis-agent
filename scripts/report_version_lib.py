@@ -13,7 +13,7 @@ from pathlib import Path
 
 MANIFEST_SCHEMA_VERSION = "1.0"
 DIFF_SCHEMA_VERSION = "1.0"
-PROTOCOL_ID = "portable-agent-0.9"
+PROTOCOL_ID = "portable-agent-1.0"
 FINAL_STATUSES = {"PASS", "PARTIAL", "FAIL"}
 DYNAMIC_CATEGORIES = {
     "current_model_version",
@@ -22,11 +22,22 @@ DYNAMIC_CATEGORIES = {
     "operator",
     "policy_status",
 }
+REQUIRED_SESSION_CAPABILITIES = {
+    "internet_search",
+    "page_reading",
+    "word_generation",
+    "pdf_png_rendering",
+    "direct_image_inspection",
+}
 SECRET_PATTERN = re.compile(
     r"(?i)(api[_ -]?key\s*[:=]|authorization\s*:|bearer\s+[A-Za-z0-9._-]{12,}|"
     r"sk-[A-Za-z0-9]{12,}|password\s*[:=]|client[_ -]?secret\s*[:=])"
 )
-URL_PATTERN = re.compile(r"https?://[^\s|)>]+", re.I)
+URL_PATTERN = re.compile(
+    r"https?://[^\s|<>\"'`()\[\]{}\uFF08\uFF09\u3010\u3011\u300A\u300B\u3008\u3009\u300C\u300D\u300E\u300F\uFF0C\u3002\uFF1B\uFF1A\u3001\uFF01\uFF1F\u201C\u201D\u2018\u2019]+",
+    re.I,
+)
+URL_TRAILING_CHARACTERS = ".,;:!?\uFF0C\u3002\uFF1B\uFF1A\uFF01\uFF1F\u3001\uFF09\u3011\u300B\u300D\u300F"
 
 
 def utc_now() -> str:
@@ -80,6 +91,28 @@ def load_json(path: Path) -> dict:
     return payload
 
 
+def validate_session_capability_context(context: dict) -> list[str]:
+    errors = []
+    if context.get("visual_probe_verified") is not True:
+        errors.append("task context visual probe was not verified")
+    if context.get("document_self_test") != "READY":
+        errors.append("task context document self-test is not READY")
+    receipt_id = context.get("session_capability_receipt_id")
+    if not isinstance(receipt_id, str) or not receipt_id.strip():
+        errors.append("task context capability receipt id is missing")
+    capabilities = context.get("session_capabilities")
+    if not isinstance(capabilities, dict):
+        errors.append("task context session capabilities are missing")
+    else:
+        missing = sorted(
+            name for name in REQUIRED_SESSION_CAPABILITIES
+            if capabilities.get(name) != "READY"
+        )
+        if missing:
+            errors.append("task context capabilities are not READY: " + ", ".join(missing))
+    return errors
+
+
 def verify_task_directory(task_dir: Path, project_root: Path) -> dict:
     task_dir = task_dir.resolve()
     project_root = project_root.resolve()
@@ -91,6 +124,9 @@ def verify_task_directory(task_dir: Path, project_root: Path) -> dict:
         raise ValueError("task context session gate must be READY")
     if context.get("protocol_id") != PROTOCOL_ID:
         raise ValueError(f"task context protocol id must be {PROTOCOL_ID}")
+    capability_errors = validate_session_capability_context(context)
+    if capability_errors:
+        raise ValueError("; ".join(capability_errors))
     if Path(str(context.get("project_root", ""))).resolve() != project_root:
         raise ValueError("task context project root does not match this project")
     if Path(str(context.get("output_root", ""))).resolve() != output_root:
@@ -109,9 +145,21 @@ def safe_relative_path(value: object) -> Path:
     return path
 
 
+def normalize_source_url(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value).strip()
+    return normalized.rstrip(URL_TRAILING_CHARACTERS)
+
+
+def extract_urls_from_text(text: str) -> list[str]:
+    return sorted({
+        normalized
+        for match in URL_PATTERN.findall(text)
+        if (normalized := normalize_source_url(match))
+    })
+
+
 def extract_source_urls(path: Path) -> list[str]:
-    text = path.read_text(encoding="utf-8")
-    return sorted({match.rstrip(".,;，。；") for match in URL_PATTERN.findall(text)})
+    return extract_urls_from_text(path.read_text(encoding="utf-8"))
 
 
 def claim_snapshot(claim: dict) -> dict:
@@ -179,6 +227,21 @@ def trace_metrics(path: Path) -> dict:
         "observation_count": len(payload.get("observations", [])),
         "stages": dict(sorted(stages.items())),
     }
+
+
+def unexpected_formal_artifacts(task_dir: Path) -> list[str]:
+    unexpected = []
+    for path in task_dir.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(task_dir).as_posix()
+        if path.suffix.lower() in {".docx", ".pdf"} and relative not in {
+            "report.docx", "render/report.pdf"
+        }:
+            unexpected.append(relative)
+        elif re.fullmatch(r"page-\d+\.png", path.name) and path.parent != task_dir / "render":
+            unexpected.append(relative)
+    return sorted(unexpected)
 
 
 def validate_manifest(task_dir: Path, payload: dict | None = None) -> list[str]:
@@ -266,6 +329,8 @@ def validate_manifest(task_dir: Path, payload: dict | None = None) -> list[str]:
         errors.append(f"rendered page is absent from report manifest: {relative}")
     for relative in sorted(manifest_pages - actual_pages):
         errors.append(f"manifest rendered page does not exist: {relative}")
+    for relative in unexpected_formal_artifacts(task_dir):
+        errors.append(f"unexpected unmanifested formal artifact: {relative}")
     diff_path = task_dir / "report_diff.json"
     if diff_path.is_file():
         try:

@@ -289,6 +289,19 @@ def validate_trace(
                 elif SECRET_PATTERN.search(observation[key]):
                     errors.append(f"{label}.{key} appears to contain authentication material")
 
+    if require_finalized:
+        failed_events = [
+            event for event in events
+            if isinstance(event, dict) and event.get("status") in {"failed", "blocked"}
+        ]
+        recorded_failures = [
+            item for item in observations
+            if isinstance(item, dict) and item.get("kind") == "failure"
+        ]
+        if failed_events and not recorded_failures:
+            errors.append(
+                "finalized execution trace with failed or blocked events must include a failure observation"
+            )
     if require_finalized and not any(
         isinstance(item, dict) and item.get("kind") == "optimization_recommendation"
         for item in observations
