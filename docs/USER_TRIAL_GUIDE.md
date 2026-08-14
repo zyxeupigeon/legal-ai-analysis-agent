@@ -48,6 +48,7 @@ Agent收到每个新会话的第一条消息后，必须先运行项目预检和
 3. 只向返回的绝对 `TASK_OUTPUT_DIR` 写文件。
 
 4. 任务目录会自动包含 `execution_trace.json`；Agent必须按 `docs/EXECUTION_TRACE_SCHEMA.md` 记录并闭合各阶段，完成逐页质检后封存轨迹，再自动生成过程优化报告。
+5. Agent随后按 `docs/REPORT_VERSIONING.md` 查找同一产品最近且哈希有效的历史报告，生成版本差异和产物清单，最后才更新运行摘要。
 
 
 如果出现 `TASK_WORKSPACE_FAIL`，不要改用父目录、同级旧项目或历史任务目录；应先纠正工作目录并重新启动Agent。
@@ -64,10 +65,12 @@ Agent收到每个新会话的第一条消息后，必须先运行项目预检和
 - `capability_declaration.md`
 - `run_summary.md`
 - `process_optimization_report.md`（记录真实耗时、工具、失败重试、瓶颈和下一轮优化建议）
+- `report_diff.json`、`report_diff.md`（事实、分析结论、来源和效率变化；首次运行建立基线）
+- `report_manifest.json`（核心产物大小和SHA-256清单）
 - `render/report.pdf`
 - `render/page-*.png`
 
-只有确定性验收、最终逐页视觉检查和过程优化报告都完成时，`run_summary.md`才能写总体PASS。验收器的结构性OK不等于总体PASS；报告任务也不得修改协议、脚本或验收配置。完成后，Agent必须在回复中明确列出 `report.docx` 与 `process_optimization_report.md` 的文件名和绝对路径。
+只有确定性验收、最终逐页视觉检查、过程优化报告、版本差异和产物清单都完成时，`run_summary.md`才能写总体PASS。验收器的结构性OK不等于总体PASS；报告任务也不得修改协议、脚本或验收配置。完成后，Agent必须在回复中明确列出 `report.docx`、`process_optimization_report.md` 与 `report_diff.md` 的文件名和绝对路径。
 
 ## 正常停止情形
 

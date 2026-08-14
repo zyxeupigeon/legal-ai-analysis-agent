@@ -1,6 +1,6 @@
 # 项目目录说明
 
-当前 `main` 是P3.4便携式Agent项目。旧网页应用已从主分支移除，可从Git历史和 `archive/p2.3.4-web` 分支恢复。
+当前 `main` 是P3.5便携式Agent项目。旧网页应用已从主分支移除，可从Git历史和 `archive/p2.3.4-web` 分支恢复。
 
 | 路径 | 职责 |
 |---|---|
@@ -14,6 +14,9 @@
 | `scripts/create_task_workspace.py` | 创建绑定当前项目副本的唯一绝对任务目录 |
 | `scripts/record_execution_event.py` | 记录并封存真实执行阶段、失败重试和优化观察 |
 | `scripts/build_process_optimization_report.py` | 从封存轨迹自动生成过程优化报告 |
+| `scripts/compare_report_versions.py` | 选择同一产品最近的有效历史基线并生成版本差异 |
+| `scripts/build_report_manifest.py` | 生成核心产物大小与SHA-256清单 |
+| `docs/REPORT_VERSIONING.md` | 基线选择、差异格式、清单和固定生成顺序 |
 | `docs/EXECUTION_TRACE_SCHEMA.md` | 执行轨迹格式、记录命令和安全边界 |
 | `scripts/self_test_document_pipeline.py` | DOCX到PDF到PNG的真实链路自检 |
 | `scripts/validate_portable_agent_output.py` | 任务输出确定性验收 |

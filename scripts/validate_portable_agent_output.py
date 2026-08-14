@@ -12,6 +12,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from execution_trace_lib import trace_sha256, validate_trace
+from report_version_lib import validate_diff, validate_manifest
 
 
 WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -217,6 +218,9 @@ def main():
         output_dir / "run_summary.md",
         output_dir / "capability_declaration.md",
         output_dir / "process_optimization_report.md",
+        output_dir / "report_diff.json",
+        output_dir / "report_diff.md",
+        output_dir / "report_manifest.json",
         output_dir / "render" / "report.pdf",
     ]
     for path in required:
@@ -225,8 +229,8 @@ def main():
 
     if context:
         try:
-            if context.get("protocol_id") != "portable-agent-0.8":
-                fail(errors, "task context protocol id is not portable-agent-0.8")
+            if context.get("protocol_id") != "portable-agent-0.9":
+                fail(errors, "task context protocol id is not portable-agent-0.9")
             if context.get("session_gate") != "READY":
                 fail(errors, "task context session gate is not READY")
             if required_context_path(context, "project_root") != project_root:
@@ -327,18 +331,46 @@ def main():
                 fail(errors, "process optimization report is not bound to the finalized execution trace")
             if optimization_path.stat().st_mtime < trace_path.stat().st_mtime:
                 fail(errors, "process optimization report predates the finalized execution trace")
+    diff_path = output_dir / "report_diff.json"
+    diff_markdown_path = output_dir / "report_diff.md"
+    manifest_path = output_dir / "report_manifest.json"
+    if diff_path.is_file():
+        for diff_error in validate_diff(output_dir):
+            fail(errors, diff_error)
+    if manifest_path.is_file():
+        for manifest_error in validate_manifest(output_dir):
+            fail(errors, manifest_error)
+        if diff_path.is_file() and manifest_path.stat().st_mtime < diff_path.stat().st_mtime:
+            fail(errors, "report manifest predates the version diff")
+        if diff_markdown_path.is_file() and manifest_path.stat().st_mtime < diff_markdown_path.stat().st_mtime:
+            fail(errors, "report manifest predates the human-readable version diff")
+
     summary_path = output_dir / "run_summary.md"
     summary_text = summary_path.read_text(encoding="utf-8") if summary_path.is_file() else ""
-    if summary_path.is_file() and report_path.is_file() and pages and optimization_path.is_file():
+    if (
+        summary_path.is_file()
+        and report_path.is_file()
+        and pages
+        and optimization_path.is_file()
+        and manifest_path.is_file()
+    ):
         newest_artifact = max(
             [
                 report_path.stat().st_mtime,
                 optimization_path.stat().st_mtime,
+                manifest_path.stat().st_mtime,
                 *(p.stat().st_mtime for p in pages),
             ]
         )
         if summary_path.stat().st_mtime < newest_artifact:
-            fail(errors, "run_summary predates final report, rendered pages, or optimization report")
+            fail(errors, "run_summary predates final report, rendered pages, optimization report, or manifest")
+        try:
+            manifest_status = json.loads(manifest_path.read_text(encoding="utf-8")).get("final_status")
+            summary_status = declared_summary_status(summary_text)
+            if summary_status != manifest_status:
+                fail(errors, "run_summary status does not match report manifest final_status")
+        except (json.JSONDecodeError, OSError) as exc:
+            fail(errors, f"report_manifest.json is unreadable or invalid: {exc}")
 
     if errors:
         print("PORTABLE_AGENT_OUTPUT_FAIL")

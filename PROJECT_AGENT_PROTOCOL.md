@@ -1,6 +1,6 @@
 # 法律AI产品分析项目 Agent 协议
 
-协议编号：portable-agent-0.8
+协议编号：portable-agent-0.9
 
 ## 目的
 
@@ -54,7 +54,7 @@
 
 ## 交付要求
 
-完整任务至少交付：可编辑 Word 报告、来源记录、逐条主张证据账本 `claim_evidence.json`、真实执行轨迹 `execution_trace.json`、能力声明、研究边界和未解决问题、最终Word的PDF与逐页图片、视觉检查结果、运行摘要、任务上下文文件、过程优化报告，以及本次使用的 Agent、模型（若可知）、工具能力和协议编号。
+完整任务至少交付：可编辑 Word 报告、来源记录、逐条主张证据账本 `claim_evidence.json`、真实执行轨迹 `execution_trace.json`、能力声明、研究边界和未解决问题、最终Word的PDF与逐页图片、视觉检查结果、运行摘要、任务上下文文件、过程优化报告、版本差异 `report_diff.json` / `report_diff.md`、防篡改产物清单 `report_manifest.json`，以及本次使用的 Agent、模型（若可知）、工具能力和协议编号。
 
 过程优化报告固定命名为 `process_optimization_report.md`，必须在正式报告完成质检后、最终回复前由 `scripts/build_process_optimization_report.py` 按照 `docs/PROCESS_OPTIMIZATION_REPORT_TEMPLATE.md` 从已封存轨迹生成。它只记录本次真实执行过程，至少包括：各阶段真实时间、实际工具与来源路径、失败和重试、主要瓶颈、无效或重复步骤、质量风险、可复用做法，以及按“收益/实现成本/风险”排序的下一轮优化建议。不得手工编造耗时，不得包含密钥、认证信息或用户敏感材料。该文件用于改进项目流程，不得混入正式 Word 正文。
 
@@ -67,12 +67,16 @@
 ```powershell
 python scripts/record_execution_event.py finalize "<TASK_OUTPUT_DIR>"
 python scripts/build_process_optimization_report.py "<TASK_OUTPUT_DIR>" --subject "<产品名称>" --agent "<Agent名称>" --model "<模型名称或未记录>" --status <PASS|PARTIAL|FAIL>
+python scripts/compare_report_versions.py "<TASK_OUTPUT_DIR>" --subject "<产品名称>"
+python scripts/build_report_manifest.py "<TASK_OUTPUT_DIR>" --subject "<产品名称>" --status <PASS|PARTIAL|FAIL>
 ```
 
 封存前存在未闭合事件、缺少必需阶段或缺少优化建议时必须修正记录，不能绕过封存。`process_optimization_report.md` 必须由上述生成器基于封存轨迹生成并包含匹配的轨迹SHA-256；不得手工编造耗时，也不得在生成优化报告后改写轨迹。
 
+随后必须按照 `docs/REPORT_VERSIONING.md` 生成版本差异和清单。同一分析对象只可与当前项目中产品标识相同、状态为PASS或PARTIAL且全部SHA-256校验通过的最近历史任务比较；没有合格历史报告时仍需生成首次基线差异。`report_manifest.json` 必须覆盖正式报告、来源、证据账本、封存轨迹、优化报告、差异文件、最终PDF和全部逐页PNG。清单生成后如上述文件变化，必须重新生成差异、清单和运行摘要。
 
-最终回复必须明确给出正式报告的**文件名和绝对路径**，同时给出过程优化报告的文件名和绝对路径；不得只说“已生成”“见输出目录”或仅提供相对路径。
+
+最终回复必须明确给出正式报告的**文件名和绝对路径**，同时给出过程优化报告及人类可读版本差异 `report_diff.md` 的文件名和绝对路径；不得只说“已生成”“见输出目录”或仅提供相对路径。
 
 ## 兼容性原则
 
@@ -86,6 +90,8 @@ Agent不得仅根据自身执行计划或工具返回值宣称任务通过。必
 2. 从最终Word重新生成PDF与逐页图片。
 3. 独立查看最终版全部页面，记录裁切、重叠、缺字、表格越界、异常空白和分页问题，并完成必要修复。所有数据表的首行必须设置为跨页重复表头；跨页后失去列含义不得通过验收。
 4. 闭合所有执行事件、记录至少一条优化建议并封存 `execution_trace.json`，再由项目生成器创建与轨迹SHA-256绑定的 `process_optimization_report.md`。
-5. 最后更新运行摘要，使其修改时间晚于最终Word、全部渲染页和过程优化报告。
-6. 运行项目提供的确定性输出验收器；有测试对象配置时必须加载对应profile。验收器的结构性 `OK` 不等同于总体 `PASS`，最终状态以运行摘要中如实声明的 PASS、PARTIAL 或 FAIL 为准。
-7. 只有确定性验收、独立视觉检查和过程优化报告均完成，运行摘要才可写总体PASS；否则必须写FAIL或PARTIAL并列出缺口。
+5. 生成 `report_diff.json` 和 `report_diff.md`；若存在同一对象且清单有效的最近历史任务，自动比较主张、分析结论、高时效事实、来源和执行效率，否则建立首次基线。
+6. 生成 `report_manifest.json`，封存核心产物的任务相对路径、大小和SHA-256；清单必须晚于其覆盖的差异及报告产物。
+7. 最后更新运行摘要，使其修改时间晚于最终Word、全部渲染页、过程优化报告和产物清单，并使PASS、PARTIAL或FAIL与清单一致。
+8. 运行项目提供的确定性输出验收器；有测试对象配置时必须加载对应profile。验收器的结构性 `OK` 不等同于总体 `PASS`，最终状态以运行摘要中如实声明的 PASS、PARTIAL 或 FAIL 为准。
+9. 只有确定性验收、独立视觉检查、过程优化报告、版本差异和产物清单均完成，运行摘要才可写总体PASS；否则必须写FAIL或PARTIAL并列出缺口。

@@ -68,6 +68,8 @@ python scripts/build_process_optimization_report.py "<TASK_OUTPUT_DIR>" --subjec
 
 生成器会把轨迹SHA-256写入 process_optimization_report.md。最终验收器会重新计算哈希；轨迹被事后改动、优化报告早于轨迹，或二者不匹配时，验收失败。
 
+优化报告生成后必须继续按 `docs/REPORT_VERSIONING.md` 生成 `report_diff.json`、`report_diff.md` 和 `report_manifest.json`，再最后更新 `run_summary.md`。版本差异会复用本轨迹中的真实阶段耗时、失败和重试计数，不接受另行估算。
+
 ## 安全边界
 
 - 只记录任务执行事实，不记录提示词全文、网页正文全文或用户材料全文。
