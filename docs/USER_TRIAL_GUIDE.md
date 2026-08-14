@@ -47,12 +47,16 @@ Agent收到每个新会话的第一条消息后，必须先运行项目预检和
 2. 运行 `python scripts/create_task_workspace.py --task-id <唯一任务ID> --session-gate READY`；
 3. 只向返回的绝对 `TASK_OUTPUT_DIR` 写文件。
 
+4. 任务目录会自动包含 `execution_trace.json`；Agent必须按 `docs/EXECUTION_TRACE_SCHEMA.md` 记录并闭合各阶段，完成逐页质检后封存轨迹，再自动生成过程优化报告。
+
+
 如果出现 `TASK_WORKSPACE_FAIL`，不要改用父目录、同级旧项目或历史任务目录；应先纠正工作目录并重新启动Agent。
 
 ## 正常结果
 
 分配的任务目录至少应出现：
 
+- `execution_trace.json`（阶段时间、工具、产物、失败重试和优化观察）
 - `task_context.json`
 - `report.docx`
 - `sources.md`

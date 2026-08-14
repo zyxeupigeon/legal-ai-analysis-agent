@@ -1,6 +1,6 @@
 # 法律AI产品分析项目 Agent 协议
 
-协议编号：portable-agent-0.7
+协议编号：portable-agent-0.8
 
 ## 目的
 
@@ -54,9 +54,23 @@
 
 ## 交付要求
 
-完整任务至少交付：可编辑 Word 报告、来源记录、逐条主张证据账本 `claim_evidence.json`、能力声明、研究边界和未解决问题、最终Word的PDF与逐页图片、视觉检查结果、运行摘要、任务上下文文件、过程优化报告，以及本次使用的 Agent、模型（若可知）、工具能力和协议编号。
+完整任务至少交付：可编辑 Word 报告、来源记录、逐条主张证据账本 `claim_evidence.json`、真实执行轨迹 `execution_trace.json`、能力声明、研究边界和未解决问题、最终Word的PDF与逐页图片、视觉检查结果、运行摘要、任务上下文文件、过程优化报告，以及本次使用的 Agent、模型（若可知）、工具能力和协议编号。
 
-过程优化报告固定命名为 `process_optimization_report.md`，必须在正式报告完成质检后、最终回复前按照 `docs/PROCESS_OPTIMIZATION_REPORT_TEMPLATE.md` 生成。它只记录本次真实执行过程，至少包括：各阶段耗时或可获得的时间记录、实际工具与来源路径、失败和重试、主要瓶颈、无效或重复步骤、质量风险、可复用做法，以及按“收益/实现成本/风险”排序的下一轮优化建议。不得虚构未记录的耗时，不得包含密钥、认证信息或用户敏感材料。该文件用于改进项目流程，不得混入正式 Word 正文。
+过程优化报告固定命名为 `process_optimization_report.md`，必须在正式报告完成质检后、最终回复前由 `scripts/build_process_optimization_report.py` 按照 `docs/PROCESS_OPTIMIZATION_REPORT_TEMPLATE.md` 从已封存轨迹生成。它只记录本次真实执行过程，至少包括：各阶段真实时间、实际工具与来源路径、失败和重试、主要瓶颈、无效或重复步骤、质量风险、可复用做法，以及按“收益/实现成本/风险”排序的下一轮优化建议。不得手工编造耗时，不得包含密钥、认证信息或用户敏感材料。该文件用于改进项目流程，不得混入正式 Word 正文。
+
+### 执行轨迹与优化报告约束
+
+任务目录分配器会自动创建 `execution_trace.json` 并记录任务目录分配事件。Agent必须按照 `docs/EXECUTION_TRACE_SCHEMA.md`，在对象确认、公开检索、证据整理、Word生成、渲染和逐页视觉质检各阶段实际开始前运行 `scripts/record_execution_event.py start`，结束后用返回的事件ID运行 `finish`；失败重试必须用 `--retry-of` 指向失败事件。开始、结束和耗时由脚本记录，不得事后估算或直接改写JSON。
+
+在最终视觉质检结束后，Agent必须记录本轮实际观察到的失败、瓶颈、无效步骤、质量风险和可复用做法（没有发生的类别可以不写），并至少记录一条带优先级、收益、成本、风险和验证方法的 `optimization_recommendation`。随后运行：
+
+```powershell
+python scripts/record_execution_event.py finalize "<TASK_OUTPUT_DIR>"
+python scripts/build_process_optimization_report.py "<TASK_OUTPUT_DIR>" --subject "<产品名称>" --agent "<Agent名称>" --model "<模型名称或未记录>" --status <PASS|PARTIAL|FAIL>
+```
+
+封存前存在未闭合事件、缺少必需阶段或缺少优化建议时必须修正记录，不能绕过封存。`process_optimization_report.md` 必须由上述生成器基于封存轨迹生成并包含匹配的轨迹SHA-256；不得手工编造耗时，也不得在生成优化报告后改写轨迹。
+
 
 最终回复必须明确给出正式报告的**文件名和绝对路径**，同时给出过程优化报告的文件名和绝对路径；不得只说“已生成”“见输出目录”或仅提供相对路径。
 
@@ -71,7 +85,7 @@ Agent不得仅根据自身执行计划或工具返回值宣称任务通过。必
 1. 在分配的绝对任务目录生成Word、来源记录、`claim_evidence.json` 和运行摘要草稿。高风险动态事实（当前模型/产品版本、价格、运营主体、政策状态）必须逐条绑定本轮实际读取的一级官方来源；未核验事实不得进入正文。
 2. 从最终Word重新生成PDF与逐页图片。
 3. 独立查看最终版全部页面，记录裁切、重叠、缺字、表格越界、异常空白和分页问题，并完成必要修复。所有数据表的首行必须设置为跨页重复表头；跨页后失去列含义不得通过验收。
-4. 生成 `process_optimization_report.md`，且其内容必须基于本轮真实执行记录和已完成的质检结果。
+4. 闭合所有执行事件、记录至少一条优化建议并封存 `execution_trace.json`，再由项目生成器创建与轨迹SHA-256绑定的 `process_optimization_report.md`。
 5. 最后更新运行摘要，使其修改时间晚于最终Word、全部渲染页和过程优化报告。
 6. 运行项目提供的确定性输出验收器；有测试对象配置时必须加载对应profile。验收器的结构性 `OK` 不等同于总体 `PASS`，最终状态以运行摘要中如实声明的 PASS、PARTIAL 或 FAIL 为准。
 7. 只有确定性验收、独立视觉检查和过程优化报告均完成，运行摘要才可写总体PASS；否则必须写FAIL或PARTIAL并列出缺口。

@@ -8,7 +8,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-PROTOCOL_ID = "portable-agent-0.7"
+PROTOCOL_ID = "portable-agent-0.8"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -68,6 +68,11 @@ def main() -> int:
         "agent/core/v1.1/WORKFLOW.md",
         "agent/skills/legal-report-review-and-verification/SKILL.md",
         "scripts/create_task_workspace.py",
+        "scripts/execution_trace_lib.py",
+        "scripts/record_execution_event.py",
+        "scripts/build_process_optimization_report.py",
+        "scripts/validate_portable_agent_output.py",
+        "docs/EXECUTION_TRACE_SCHEMA.md",
     )
     for relative in required_files:
         path = PROJECT_ROOT / relative

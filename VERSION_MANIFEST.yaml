@@ -1,5 +1,5 @@
-manifest_version: "1.3"
-project_phase: "P3.3"
+manifest_version: "1.4"
+project_phase: "P3.4"
 release_channel: "user-trial"
 repository_visibility: "private"
 repository_owner_type: "personal"
@@ -19,8 +19,8 @@ frozen_files:
   workflow_sha256: "eab9919c5746c86babb04038bfa0ff2083cf16afceb748384f588e71ab49e6f4"
 
 portable_agent:
-  protocol_version: "0.7"
-  protocol_id: "portable-agent-0.7"
+  protocol_version: "0.8"
+  protocol_id: "portable-agent-0.8"
   mode: "user_selected_local_agent"
   required_specific_agent: false
   required_specific_model: false
@@ -31,18 +31,23 @@ portable_agent:
   task_workspace_allocator: "scripts/create_task_workspace.py"
   session_gate: "required_ready_before_allocation"
   claim_evidence: "required_schema_1.0"
+  execution_trace: "required_schema_1.0_finalized"
+  optimization_report_source: "finalized_execution_trace_sha256_bound"
+  execution_trace_security: "reject_secret_like_content"
   repeating_table_headers: "required"
   launcher_root_environment: "LEGAL_AI_PROJECT_ROOT"
   windows_launcher: "START_AGENT.cmd"
   launcher_runtime: "python_no_downloaded_ps1"
   preflight_command: "python scripts/check_agent_workspace.py"
   self_test_command: "START_AGENT.cmd -SelfTest"
+  validated_hosts_for_protocol: "portable-agent-0.7"
   validated_hosts:
     - "opencode_1.18.15_deepseek"
     - "claude_code_2.1.226_deepseek"
-  end_to_end_report_validation: "passed"
-  safe_stop_validation: "passed"
-  user_trial_readiness: "ready"
+  automated_contract_validation: "passed"
+  end_to_end_report_validation: "pending_user_trial_for_portable_agent_0.8"
+  safe_stop_automated_validation: "passed"
+  user_trial_readiness: "ready_for_user_trial"
 
 data_policy:
   public_research_allowed: true

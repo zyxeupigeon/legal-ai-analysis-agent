@@ -2,7 +2,7 @@
 
 面向法律AI产品公开信息研究、证据核验、Word报告生成和逐页质检的便携式Agent工作目录。
 
-当前版本为P3.3用户试用版，GitHub仓库保持私有，通过手动发送ZIP分享。项目不绑定特定Agent、模型、模型API、浏览器或MCP；使用者负责安装并登录一个具备所需能力的命令行或图形Agent。
+当前版本为P3.4用户试用版，GitHub仓库保持私有，通过手动发送ZIP分享。项目不绑定特定Agent、模型、模型API、浏览器或MCP；使用者负责安装并登录一个具备所需能力的命令行或图形Agent。
 
 ## Windows首次使用
 
@@ -36,11 +36,15 @@ python scripts/create_task_workspace.py --task-id <本次唯一任务ID> --sessi
 
 只有返回 `TASK_WORKSPACE_OK` 后才能继续，全部产物必须写入返回的绝对 `TASK_OUTPUT_DIR`。若Agent复用了另一份项目副本、旧会话或错误工作目录，分配器会停止任务，避免报告写到同级旧项目。
 
+分配器还会自动初始化 `execution_trace.json`。Agent必须用 `scripts/record_execution_event.py` 记录阶段开始、结束、失败和重试；完成逐页质检后封存轨迹，再用 `scripts/build_process_optimization_report.py` 从真实记录生成优化报告。具体命令见 `docs/EXECUTION_TRACE_SCHEMA.md`。
+
+
 ## 正常交付物
 
 每个任务目录至少应包含：
 
 - `task_context.json`
+- `execution_trace.json`（真实阶段、耗时、失败重试和优化观察的机器可验收轨迹）
 - `report.docx`
 - `sources.md`
 - `claim_evidence.json`（逐条主张、来源和正文位置的机器可验收账本）

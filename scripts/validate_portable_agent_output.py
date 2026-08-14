@@ -8,6 +8,12 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+from execution_trace_lib import trace_sha256, validate_trace
+
+
 WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 HTTP_URL = re.compile(r"^https?://", re.I)
 CLAIM_TYPES = {"verified_fact", "company_claim", "analysis", "unverified"}
@@ -204,6 +210,7 @@ def main():
 
     required = [
         output_dir / "task_context.json",
+        output_dir / "execution_trace.json",
         output_dir / "report.docx",
         output_dir / "sources.md",
         output_dir / "claim_evidence.json",
@@ -218,8 +225,8 @@ def main():
 
     if context:
         try:
-            if context.get("protocol_id") != "portable-agent-0.7":
-                fail(errors, "task context protocol id is not portable-agent-0.7")
+            if context.get("protocol_id") != "portable-agent-0.8":
+                fail(errors, "task context protocol id is not portable-agent-0.8")
             if context.get("session_gate") != "READY":
                 fail(errors, "task context session gate is not READY")
             if required_context_path(context, "project_root") != project_root:
@@ -233,6 +240,22 @@ def main():
             fail(errors, f"task_context.json is unreadable or invalid: {exc}")
 
     pages = sorted((output_dir / "render").glob("page-*.png"))
+    trace_path = output_dir / "execution_trace.json"
+    trace_digest = None
+    if trace_path.is_file():
+        try:
+            trace_payload = json.loads(trace_path.read_text(encoding="utf-8"))
+            for trace_error in validate_trace(
+                trace_payload,
+                expected_task_id=output_dir.name,
+                require_finalized=True,
+                require_report_stages=True,
+            ):
+                fail(errors, trace_error)
+            trace_digest = trace_sha256(trace_path)
+        except (json.JSONDecodeError, OSError, TypeError, ValueError) as exc:
+            fail(errors, f"execution_trace.json is unreadable or invalid: {exc}")
+
     if not pages:
         fail(errors, "no rendered page PNG files")
     else:
@@ -296,6 +319,14 @@ def main():
             if section not in optimization_text:
                 fail(errors, f"process optimization report section absent: {section}")
 
+        if trace_digest:
+            digest_match = re.search(
+                r"执行轨迹SHA-256：([0-9a-f]{64})", optimization_text, flags=re.IGNORECASE
+            )
+            if not digest_match or digest_match.group(1).lower() != trace_digest:
+                fail(errors, "process optimization report is not bound to the finalized execution trace")
+            if optimization_path.stat().st_mtime < trace_path.stat().st_mtime:
+                fail(errors, "process optimization report predates the finalized execution trace")
     summary_path = output_dir / "run_summary.md"
     summary_text = summary_path.read_text(encoding="utf-8") if summary_path.is_file() else ""
     if summary_path.is_file() and report_path.is_file() and pages and optimization_path.is_file():

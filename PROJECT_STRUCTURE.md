@@ -1,6 +1,6 @@
 # 项目目录说明
 
-当前 `main` 是P3.3便携式Agent项目。旧网页应用已从主分支移除，可从Git历史和 `archive/p2.3.4-web` 分支恢复。
+当前 `main` 是P3.4便携式Agent项目。旧网页应用已从主分支移除，可从Git历史和 `archive/p2.3.4-web` 分支恢复。
 
 | 路径 | 职责 |
 |---|---|
@@ -12,6 +12,9 @@
 | `scripts/start_agent.py` | Agent检测与启动，不执行下载的PowerShell脚本 |
 | `scripts/check_agent_workspace.py` | 项目根目录、文件、Python和文档工具预检 |
 | `scripts/create_task_workspace.py` | 创建绑定当前项目副本的唯一绝对任务目录 |
+| `scripts/record_execution_event.py` | 记录并封存真实执行阶段、失败重试和优化观察 |
+| `scripts/build_process_optimization_report.py` | 从封存轨迹自动生成过程优化报告 |
+| `docs/EXECUTION_TRACE_SCHEMA.md` | 执行轨迹格式、记录命令和安全边界 |
 | `scripts/self_test_document_pipeline.py` | DOCX到PDF到PNG的真实链路自检 |
 | `scripts/validate_portable_agent_output.py` | 任务输出确定性验收 |
 | `scripts/extract_reference_document.py` | 参考DOCX内容提取 |
