@@ -1,13 +1,13 @@
-manifest_version: "1.6"
-project_phase: "P3.6"
-release_channel: "user-trial"
+manifest_version: "1.7"
+project_phase: "P3.7"
+release_channel: "public-information"
 repository_visibility: "private"
 repository_owner_type: "personal"
 
 baselines:
-  agent_core: "1.1"
-  system_prompt: "1.1"
-  workflow: "1.1"
+  agent_core: "1.2"
+  system_prompt: "1.2"
+  workflow: "1.2"
 
 skill:
   name: "legal-report-review-and-verification"
@@ -15,8 +15,8 @@ skill:
   source_sha256: "f7c502fa4908981276f1e0001fcc6b8572ad183a2c5848d9fd5acec33c5b72d4"
 
 frozen_files:
-  system_prompt_sha256: "44d8e51e7016a7d431a95b3f67e1b519102caf996a3a319593191c6319a24596"
-  workflow_sha256: "eab9919c5746c86babb04038bfa0ff2083cf16afceb748384f588e71ab49e6f4"
+  system_prompt_sha256: "8e7b7156d2c1443020745b60e86b7f8370143f59f6be39a738d3be8977eaa379"
+  workflow_sha256: "b3788e07695dff9af1a15a296d729b25450bd08459845f5c40a9e9b3e3b7bfa3"
 
 portable_agent:
   protocol_version: "1.0"
@@ -55,18 +55,25 @@ portable_agent:
     - "claude_code_2.1.226_deepseek"
   automated_contract_validation: "passed"
   fresh_github_zip_regression: "passed_no_git_copy"
-  end_to_end_report_validation: "pending_vision_capable_host_user_trial"
+  end_to_end_report_validation: "passed_prior_p3_6_tongyifarui_and_delifasou_public_information_runs"
   safe_stop_automated_validation: "passed"
   safe_stop_live_validation: "passed_opencode_deepseek_chat_no_task_created"
-  user_trial_readiness: "ready_for_user_trial"
+  public_information_readiness: "ready_for_use"
 
 data_policy:
   public_research_allowed: true
-  test_data: "public_or_irreversibly_desensitized_only"
+  test_data: "public_only"
   secrets_in_repository: false
   user_materials_in_repository: false
   reports_in_repository: false
-  external_services_allowed: true
+  external_services_allowed: "free_public_research_only"
+  target_product_registration_allowed: false
+  target_product_login_allowed: false
+  paid_content_or_recharge_allowed: false
+  target_product_api_mcp_skills_invocation_allowed: false
+  target_product_file_upload_allowed: false
+  target_product_function_testing_allowed: false
+  target_product_accuracy_claims_allowed: false
   formal_report_publication_allowed: false
   training_allowed: false
 

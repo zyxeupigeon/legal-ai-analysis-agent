@@ -62,8 +62,8 @@ def main() -> int:
 
     required_files = (
         "PROJECT_AGENT_PROTOCOL.md",
-        "agent/core/v1.1/SYSTEM_PROMPT.md",
-        "agent/core/v1.1/WORKFLOW.md",
+        "agent/core/v1.2/SYSTEM_PROMPT.md",
+        "agent/core/v1.2/WORKFLOW.md",
         "agent/skills/legal-report-review-and-verification/SKILL.md",
         "scripts/create_task_workspace.py",
         "scripts/session_preflight_gate.py",

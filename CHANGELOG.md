@@ -1,5 +1,12 @@
 # 变更记录
 
+## 1.8.0 - 2026-08-17
+
+- 项目阶段升级为P3.7公开信息分析版，目标读者明确为从未接触目标法律AI、希望先了解大致信息的用户。
+- 正式报告只使用免费、公开、无需登录的资料；目标产品注册、登录、付费、充值、API/MCP/Skills调用、文件上传和功能实测全部改为项目范围外。
+- 报告PASS仅表示公开信息研究、证据绑定、文档生成和逐页质检流程通过，不表示目标产品通过测试或获得推荐。
+- 默认报告结构改为产品身份、历程、定位、目标用户、公开功能、价格、接入披露、隐私责任、公共信号、证据边界和初步判断。
+- 核心规范升级至v1.2，用户指南改名为 `docs/PUBLIC_INFORMATION_GUIDE.md`，并新增范围契约测试防止后续回退。
 ## 1.7.0 - 2026-08-14
 
 - Upgraded to `portable-agent-1.0` / P3.6 with a one-use direct-image capability challenge and receipt-bound task allocation. Text-only or geometry-only inspection is now a hard BLOCKED condition.
@@ -30,7 +37,7 @@
 - 输出验收器新增主张来源绑定、分析依赖、未核验事实禁入正文和 profile 禁用事实模式检查。
 - Word 数据表首行必须设置跨页重复表头；验收器直接检查 `w:tblHeader`，避免续页失去列含义。
 - `START_AGENT.cmd`、预检和文档链路自检改为 Python 入口，不再执行下载的未签名 `.ps1` 文件，避免 Windows MOTW/RemoteSigned 阻断。
-- 新增通义法睿真实试用回归 profile，冻结截至 2026-08-14 的无来源 Qwen3.8 误写问题。
+- 新增通义法睿公开信息报告回归 profile，冻结截至 2026-08-14 的无来源 Qwen3.8 误写问题。
 
 ## 1.3.0 - 2026-08-12
 

@@ -1,8 +1,14 @@
 # Legal AI Analysis Agent
 
-面向法律AI产品公开信息研究、证据核验、Word报告生成和逐页质检的便携式Agent工作目录。
+面向首次了解某款法律AI产品的用户，以免费、公开、无需登录的信息完成产品概览、证据核验、Word报告生成和逐页质检的便携式Agent工作目录。
 
-当前版本为P3.6用户试用版，GitHub仓库保持私有，通过手动发送ZIP分享。项目不绑定特定Agent、模型、模型API、浏览器或MCP；使用者负责安装并登录一个具备所需能力的命令行或图形Agent。
+当前版本为P3.7公开信息分析版，GitHub仓库保持私有，通过手动发送ZIP分享。项目不绑定特定Agent、模型、模型API、浏览器或MCP；使用者负责安装并登录一个具备所需能力的命令行或图形Agent。
+
+## 项目定位
+
+输入一个明确的法律AI产品名称，Agent会自主查找免费公开资料，区分已核实事实、企业公开声明和分析判断，并生成适合初次了解该产品的分析报告。
+
+本项目不注册或登录目标产品，不购买、充值、调用目标产品API/MCP/Skills，不上传文件，不操作产品功能，也不测试准确率、稳定性或实际效果。报告可以介绍厂商公开披露的功能和接入方式，但必须明确这不等于本项目已经实际验证。报告PASS只代表公开信息研究和文档质量流程通过。
 
 ## Windows首次使用
 
@@ -25,7 +31,7 @@
 Agent收到新会话的第一条消息后，会先自动执行项目预检和能力闸门。只有回复 `SESSION_PREFLIGHT_READY` 才会继续；若回复 `SESSION_PREFLIGHT_BLOCKED`，不会生成报告，而会说明需要你确认、处理或重启的事项。进入Agent后输入：
 
 ```text
-请完整读取项目协议，然后分析法律AI产品“得理法搜”，生成并质检Word报告。
+请完整读取项目协议，只使用免费、公开、无需登录的信息分析法律AI产品“得理法搜”，不得注册、付费、调用接口或实测产品；生成并质检Word报告。
 ```
 
 ## 输出目录安全
@@ -65,14 +71,15 @@ After the receipt is issued, generate the formal file directly as `report.docx` 
 
 ## 项目边界
 
-- 只研究公开、可核验且无需登录或付费的资料。
+- 只研究免费、公开、可核验且无需登录的资料。
+- 不注册、登录、付费、充值、调用目标产品API/MCP/Skills、上传材料或实测产品；不对准确率和实际效果作实测结论。
 - 不把密钥、账号、客户资料、参考报告或运行产物提交到Git。
 - 输出是研究测试材料，不构成法律意见。
 - 网页应用、FastAPI后端及其运行依赖已从 `main` 移除；历史代码仍可从Git历史和 `archive/p2.3.4-web` 分支取得。
 
 Quick display and usage guide: [`项目成果展示与使用说明.md`](项目成果展示与使用说明.md).
 
-详细步骤见 `docs/USER_TRIAL_GUIDE.md`，版本管理规则见 `docs/REPORT_VERSIONING.md`，唯一业务协议见 `PROJECT_AGENT_PROTOCOL.md`。
+详细步骤见 `docs/PUBLIC_INFORMATION_GUIDE.md`，版本管理规则见 `docs/REPORT_VERSIONING.md`，唯一业务协议见 `PROJECT_AGENT_PROTOCOL.md`。
 
 ## 开发检查
 

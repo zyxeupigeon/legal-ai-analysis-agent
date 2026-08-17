@@ -27,7 +27,7 @@ PROTECTED_FIXED_PATHS = (
     "AGENTS.md",
     "CLAUDE.md",
     "GEMINI.md",
-    "agent/core/v1.1/WORKFLOW.md",
+    "agent/core/v1.2/WORKFLOW.md",
     "agent/skills/legal-report-review-and-verification/SKILL.md",
     "scripts/check_agent_workspace.py",
     "scripts/session_preflight_gate.py",

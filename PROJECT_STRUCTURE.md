@@ -1,12 +1,12 @@
 # 项目目录说明
 
-当前 `main` 是P3.6便携式Agent项目。旧网页应用已从主分支移除，可从Git历史和 `archive/p2.3.4-web` 分支恢复。
+当前 `main` 是P3.7免费公开信息分析版便携式Agent项目。旧网页应用已从主分支移除，可从Git历史和 `archive/p2.3.4-web` 分支恢复。
 
 | 路径 | 职责 |
 |---|---|
 | `PROJECT_AGENT_PROTOCOL.md` | 唯一业务协议、能力边界和任务目录绑定规则 |
 | `AGENTS.md`、`CLAUDE.md`、`GEMINI.md` | 不同Agent的自动发现入口 |
-| `agent/core/v1.1` | 冻结的系统提示词、工作流和任务边界摘要 |
+| `agent/core/v1.2` | 冻结的系统提示词、工作流和任务边界摘要 |
 | `agent/skills/legal-report-review-and-verification` | 锁定并校验哈希的法律报告Skill |
 | `OPEN_SOURCE_DISCOVERY_PROTOCOL.md` | GitHub成熟组件发现、筛选和替换判定规则 |
 | `scripts/start_agent.py` | Agent检测与启动，不执行下载的PowerShell脚本 |

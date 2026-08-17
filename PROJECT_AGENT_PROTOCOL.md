@@ -6,6 +6,17 @@
 
 本仓库是一个可由不同本地命令行或图形 Agent 接管的工作目录。使用者在仓库根目录启动已有 Agent；项目不绑定特定厂商、模型、模型 API、浏览器或 MCP。
 
+## 公共信息分析定位
+
+本项目面向“从未接触某款法律AI、希望先了解其大致情况”的普通读者。正式任务只收集免费、公开、无需登录即可读取的信息，并把它们整理为带来源和证据边界的初步分析报告。
+
+- 产品名称是唯一必填输入；Agent 自主完成公开检索、正文读取、交叉核验、报告撰写和逐页质检。
+- 可以记录官网公开披露的 API、MCP、Skills、价格、功能和客户案例，但只能证明“公开材料这样描述”，不能证明相关能力已经过本项目实际使用验证。
+- 不注册目标产品账号，不登录目标产品，不购买订阅或内容，不充值，不调用目标产品 API、MCP 或 Skills，不上传文件，不操作目标产品功能，也不使用真实案件或客户材料。
+- 不对目标产品的准确率、稳定性、召回率、幻觉率、实际效率或专业效果作实测结论；缺少公开独立证据时明确写“无法从公开资料证明”。
+- 报告中的 PASS 只表示本项目的公开信息研究、文档生成和质量检查流程完整通过，不表示目标法律AI产品通过测试或获得推荐。
+- 注册、付费、接口调用、产品操作和准确率基准测试均不属于本项目后续完成条件，也不因使用者拥有账号、密钥或预算而自动纳入。
+
 ## 启动和任务目录绑定
 
 1. **新会话的第一项动作必须是项目预检。** 无论使用者第一句话是分析请求、普通问题、问候还是其他内容，Agent 都必须先确认当前工作目录和根目录绑定，完整读取本协议，并运行 `python scripts/check_agent_workspace.py`。该入口不得依赖执行下载的未签名 PowerShell 脚本。在预检完成前，不得实质回答问题、开始研究或调用任务工具。
@@ -18,7 +29,7 @@
 6. BLOCKED 时不得运行任务目录分配器，不得开始事实研究，不得创建 `report.docx`、草稿报告或其他正式报告产物。必须立即告诉使用者：阻断项、影响、为什么不能直接继续、建议操作、风险和是否需要重启；等待使用者处理并开启可用会话后重新自检。
 7. 即使已开始任务，若在正式报告生成前发现新的上述阻断条件，也必须停止，不得用降级能力生成冒充完整结果的报告；可以保留已产生的诊断记录，但不得生成正式 Word。
 8. 确认当前工作目录是本仓库根目录，即当前目录中同时存在 `START_AGENT.cmd`、`PROJECT_AGENT_PROTOCOL.md` 和 `scripts/create_task_workspace.py`。若环境变量 `LEGAL_AI_PROJECT_ROOT` 存在，其绝对路径必须与当前仓库根目录完全相同；不同时声明 BLOCKED。
-9. 完整阅读 `agent/core/v1.1/SYSTEM_PROMPT.md`、`agent/core/v1.1/WORKFLOW.md` 和目标任务涉及的 Skill。涉及寻找、比较、采用或替换开源项目时，还必须完整阅读 `OPEN_SOURCE_DISCOVERY_PROTOCOL.md`。
+9. 完整阅读 `agent/core/v1.2/SYSTEM_PROMPT.md`、`agent/core/v1.2/WORKFLOW.md` 和目标任务涉及的 Skill。涉及寻找、比较、采用或替换开源项目时，还必须完整阅读 `OPEN_SOURCE_DISCOVERY_PROTOCOL.md`。
 10. 只有声明 `SESSION_PREFLIGHT_READY` 后，才可在写入任何任务文件前运行：
 
    `python scripts/create_task_workspace.py --task-id <本次唯一任务ID> --session-gate READY --capability-receipt "<CAPABILITY_RECEIPT>"`
@@ -46,7 +57,7 @@
 - 搜索失败、正文不可读取或证据不足时，降低结论、缩减报告或停止任务。
 - 事实、企业自述和分析判断必须分开表达。
 - 冲突口径并列说明，不自行挑选或强行合并。
-- 不访问登录、付费或受限内容；涉及账号、付费、对外发送或扩大权限时先征得用户同意。
+- 不访问登录、付费或受限内容，不使用目标产品账号、登录态、验证码、Cookie、密钥或余额；这类操作属于项目范围外，不以征得同意作为继续分析的分支。对外发送、发布、共享或扩大权限仍须另行取得用户明确同意。
 - 不读取、输出、提交或复制 `.env`、认证缓存、令牌和其他密钥。
 - 开源项目只有在功能精确匹配、许可证兼容、成熟度证据充分且隔离验证通过后才能作为替换候选；近似项目只能交由用户判断。
 - 不得覆盖参考报告、冻结文件、其他任务产物或仓库外文件。
@@ -100,7 +111,7 @@ Agent不得仅根据自身执行计划或工具返回值宣称任务通过。必
 
 1. Before declaring `SESSION_PREFLIGHT_READY`, run `python scripts/session_preflight_gate.py prepare`. Open the emitted `PROBE_IMAGE` with the same direct image-view capability that will be used for final report pages. Do not obtain the code from OCR, PDF geometry, source files, hashes, or another model.
 2. After direct image inspection and real tests of internet search plus full-page reading, run `python scripts/session_preflight_gate.py verify --challenge-id <CHALLENGE_ID> --visual-code <SIX_DIGIT_CODE> --internet-search READY --page-reading READY --word-generation READY --pdf-png-rendering READY`. A successful command emits a one-use `CAPABILITY_RECEIPT`.
-3. If direct image inspection, full-page reading, authentication, permissions, or any other required capability is unavailable in the current continuous session, declare `SESSION_PREFLIGHT_BLOCKED`. Geometry-only PDF checks are not a substitute for direct final-page inspection and must not be used to declare READY or PASS.
+3. If direct image inspection, full-page reading, permissions, or any other required capability is unavailable in the current continuous session, declare `SESSION_PREFLIGHT_BLOCKED`. Target-product authentication is outside this project and is never a READY requirement. Geometry-only PDF checks are not a substitute for direct final-page inspection and must not be used to declare READY or PASS.
 4. Task allocation requires the one-use capability receipt. A receipt from another project copy, an expired receipt, or a consumed receipt must be rejected.
 5. Generate the editable report directly as `<TASK_OUTPUT_DIR>/report.docx`. Render it only with `python scripts/render_report.py "<TASK_OUTPUT_DIR>"`; this command owns the rendering execution event, records failures, links retries, and writes only `render/report.pdf` plus `render/page-*.png`.
 6. Every failed or blocked execution attempt must be closed immediately with its real status before retrying. A finalized trace containing a failed or blocked event must include a `failure` observation, so the process optimization report cannot state that no failure occurred.

@@ -6,8 +6,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = {
-    ROOT / "agent/core/v1.1/SYSTEM_PROMPT.md": "44d8e51e7016a7d431a95b3f67e1b519102caf996a3a319593191c6319a24596",
-    ROOT / "agent/core/v1.1/WORKFLOW.md": "eab9919c5746c86babb04038bfa0ff2083cf16afceb748384f588e71ab49e6f4",
+    ROOT / "agent/core/v1.2/SYSTEM_PROMPT.md": "8e7b7156d2c1443020745b60e86b7f8370143f59f6be39a738d3be8977eaa379",
+    ROOT / "agent/core/v1.2/WORKFLOW.md": "b3788e07695dff9af1a15a296d729b25450bd08459845f5c40a9e9b3e3b7bfa3",
     ROOT / "agent/skills/legal-report-review-and-verification/SKILL.md": "f7c502fa4908981276f1e0001fcc6b8572ad183a2c5848d9fd5acec33c5b72d4",
 }
 
