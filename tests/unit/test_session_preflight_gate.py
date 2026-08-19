@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -27,6 +28,12 @@ def configure_gate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
         gate.subprocess,
         "run",
         lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "SELF_TEST_OK\n", ""),
+    )
+    registry_dir = project_root / "docs"
+    registry_dir.mkdir()
+    (registry_dir / "VISUAL_CHANNEL_REGISTRY.md").write_text(
+        '## 机器可读清单\n\n```json\n{"channels": ["qwen3-vl-plus"]}\n```\n',
+        encoding="utf-8",
     )
     return project_root
 
@@ -130,3 +137,78 @@ def test_receipt_without_visual_channel_is_rejected(monkeypatch, tmp_path) -> No
 
     with pytest.raises(ValueError, match="evidence SHA-256"):
         gate.validate_capability_receipt(receipt_path, project_root)
+
+
+def test_unregistered_channel_is_rejected(monkeypatch, tmp_path) -> None:
+    configure_gate(monkeypatch, tmp_path)
+    challenge_id, _ = gate.prepare_challenge()
+    args = argparse.Namespace(
+        challenge_id=challenge_id,
+        visual_code="123456",
+        visual_channel="not-registered",
+        visual_channel_evidence=None,
+        internet_search="READY",
+        page_reading="READY",
+        word_generation="READY",
+        pdf_png_rendering="READY",
+    )
+    with pytest.raises(ValueError, match="not registered"):
+        gate.verify_challenge(args)
+
+
+def test_registered_channel_with_matching_evidence_passes(monkeypatch, tmp_path) -> None:
+    configure_gate(monkeypatch, tmp_path)
+    challenge_id, image_path = gate.prepare_challenge()
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "channel": "qwen3-vl-plus",
+                "image_sha256": hashlib.sha256(image_path.read_bytes()).hexdigest(),
+                "visual_code": "123456",
+            }
+        ),
+        encoding="utf-8",
+    )
+    args = argparse.Namespace(
+        challenge_id=challenge_id,
+        visual_code="123456",
+        visual_channel="qwen3-vl-plus",
+        visual_channel_evidence=str(evidence_path),
+        internet_search="READY",
+        page_reading="READY",
+        word_generation="READY",
+        pdf_png_rendering="READY",
+    )
+    receipt_path = gate.verify_challenge(args)
+    payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert payload["visual_channel"] == "qwen3-vl-plus"
+    assert payload["visual_channel_evidence_sha256"]
+
+
+def test_evidence_content_mismatch_is_rejected(monkeypatch, tmp_path) -> None:
+    configure_gate(monkeypatch, tmp_path)
+    challenge_id, image_path = gate.prepare_challenge()
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "channel": "qwen3-vl-plus",
+                "image_sha256": hashlib.sha256(image_path.read_bytes()).hexdigest(),
+                "visual_code": "999999",
+            }
+        ),
+        encoding="utf-8",
+    )
+    args = argparse.Namespace(
+        challenge_id=challenge_id,
+        visual_code="123456",
+        visual_channel="qwen3-vl-plus",
+        visual_channel_evidence=str(evidence_path),
+        internet_search="READY",
+        page_reading="READY",
+        word_generation="READY",
+        pdf_png_rendering="READY",
+    )
+    with pytest.raises(ValueError, match="visual_code does not match"):
+        gate.verify_challenge(args)

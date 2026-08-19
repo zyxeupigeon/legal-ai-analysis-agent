@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import secrets
 import shutil
 import struct
@@ -29,6 +30,33 @@ REQUIRED_CAPABILITIES = (
     "pdf_png_rendering",
     "direct_image_inspection",
 )
+
+CHANNEL_REGISTRY_PATH = PROJECT_ROOT / "docs" / "VISUAL_CHANNEL_REGISTRY.md"
+HUMAN_VISUAL_CHANNEL = "human"
+
+
+def load_registered_channels() -> set[str]:
+    """Return visual channel ids registered in docs/VISUAL_CHANNEL_REGISTRY.md.
+
+    Only the machine-readable JSON block is parsed; the human channel is always
+    allowed without registration. A missing or unparsable registry fails safe:
+    no additional channels become available.
+    """
+    try:
+        text = CHANNEL_REGISTRY_PATH.read_text(encoding="utf-8")
+    except OSError:
+        return set()
+    match = re.search(r"```json\n(\{.*?\})\n```", text, re.DOTALL)
+    if not match:
+        return set()
+    try:
+        payload = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return set()
+    channels = payload.get("channels")
+    if not isinstance(channels, list):
+        return set()
+    return {str(channel).strip() for channel in channels if str(channel).strip()}
 
 
 DIGITS = {
@@ -89,6 +117,47 @@ def png_chunk(kind: bytes, data: bytes) -> bytes:
 
 
 def write_visual_probe(path: Path, code: str) -> None:
+    """Render the probe image so visual models can read it reliably.
+
+    Primary path renders the code with an anti-aliased standard font
+    (PyMuPDF Base-14 Helvetica, no system font dependency); the hand-drawn
+    pixel matrix is kept as a fallback when PyMuPDF is unavailable.
+    """
+    path.parent.mkdir(parents=True, exist_ok=False)
+    try:
+        import pymupdf
+    except ImportError:  # pragma: no cover - older PyMuPDF naming
+        try:
+            import fitz as pymupdf
+        except ImportError:
+            pymupdf = None
+    if pymupdf is not None:
+        _write_visual_probe_font(path, code, pymupdf)
+    else:
+        _write_visual_probe_pixels(path, code)
+
+
+def _write_visual_probe_font(path: Path, code: str, pdf_module) -> None:
+    width, height = 720, 240
+    fontname = "helv"
+    fontsize = 160
+    document = pdf_module.open()
+    page = document.new_page(width=width, height=height)
+    text_width = pdf_module.get_text_length(code, fontname=fontname, fontsize=fontsize)
+    baseline_x = (width - text_width) / 2
+    baseline_y = (height + fontsize * 0.7) / 2
+    page.insert_text(
+        (baseline_x, baseline_y),
+        code,
+        fontname=fontname,
+        fontsize=fontsize,
+        color=(0x12 / 255, 0x2D / 255, 0x49 / 255),
+    )
+    page.get_pixmap(matrix=pdf_module.Matrix(1, 1)).save(str(path))
+    document.close()
+
+
+def _write_visual_probe_pixels(path: Path, code: str) -> None:
     width, height, scale = 720, 240, 18
     pixels = bytearray([255]) * (width * height * 3)
     glyph_width = 5 * scale
@@ -116,7 +185,6 @@ def write_visual_probe(path: Path, code: str) -> None:
         + png_chunk(b"IDAT", zlib.compress(raw, 9))
         + png_chunk(b"IEND", b"")
     )
-    path.parent.mkdir(parents=True, exist_ok=False)
     path.write_bytes(data)
 
 
@@ -162,7 +230,14 @@ def verify_challenge(args: argparse.Namespace) -> Path:
     visual_channel = (args.visual_channel or "").strip()
     if not visual_channel:
         raise ValueError("a visual channel must be declared with --visual-channel")
-    if visual_channel != "human":
+    registered = load_registered_channels()
+    if visual_channel != HUMAN_VISUAL_CHANNEL and visual_channel not in registered:
+        raise ValueError(
+            f"visual channel {visual_channel!r} is not registered; "
+            "register it in docs/VISUAL_CHANNEL_REGISTRY.md "
+            f"or use --visual-channel {HUMAN_VISUAL_CHANNEL}"
+        )
+    if visual_channel != HUMAN_VISUAL_CHANNEL:
         if not args.visual_channel_evidence:
             raise ValueError(
                 "non-human visual channels require --visual-channel-evidence "
@@ -171,6 +246,17 @@ def verify_challenge(args: argparse.Namespace) -> Path:
         evidence_path = Path(args.visual_channel_evidence).resolve()
         if not evidence_path.is_file():
             raise ValueError(f"visual channel evidence file not found: {evidence_path}")
+        try:
+            evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"visual channel evidence is not valid JSON: {exc}") from exc
+        probe_image = directory / "visual-probe.png"
+        if evidence.get("image_sha256") != hashlib.sha256(probe_image.read_bytes()).hexdigest():
+            raise ValueError("visual channel evidence does not match the probe image")
+        if evidence.get("visual_code") != args.visual_code:
+            raise ValueError("visual channel evidence visual_code does not match --visual-code")
+        if evidence.get("channel") != visual_channel:
+            raise ValueError("visual channel evidence channel does not match --visual-channel")
     else:
         evidence_path = None
     declarations = {

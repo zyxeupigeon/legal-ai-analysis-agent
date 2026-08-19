@@ -10,6 +10,7 @@
 - 新增 `scripts/visual_qa_dashscope.py --read-probe` 探针读码模式，输出可核验的通道调用记录（图像 SHA-256、通道标识、时间戳、返回原文）。
 - 实测：`qwen3-vl-plus` 读点阵探针码多次哈希校验失败（`17663`/`172653`/`096347` 均未通过），判定探针环节固定使用 human 人工通道（实测签发 receipt 成功）；页面质检通道验证通过（legora 报告 9 页）。
 - 端到端验证：`legora-20260819`（protocol 1.1）总体 PASS——human 探针签发一次性凭证 + qwen3-vl-plus 通道页面质检 + 使用者人工确认；`VERSION_MANIFEST.yaml` `validated_hosts` 登记为 `claude_code_deepseek_human_visual_probe_qwen3vl_page_qa`。
+- 加固：探针图改为 PyMuPDF 标准字体抗锯齿渲染（原像素矩阵保留为 fallback），提升视觉模型读码率；`verify` 新增两道校验——视觉通道必须在 `docs/VISUAL_CHANNEL_REGISTRY.md` 机器可读清单中登记（human 除外），evidence 内容须与探针图 SHA-256、visual_code、通道 ID 一致，伪造通道或伪造证据将被拒绝。
 - 待办：1.1 的 validated_hosts 尚为空白，需完成堵法有效性测试用例后再登记验证记录。
 
 ## 1.9.0 - 2026-08-18
