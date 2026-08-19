@@ -1,5 +1,5 @@
-manifest_version: "1.9"
-project_phase: "P3.8"
+manifest_version: "1.10"
+project_phase: "P3.9"
 release_channel: "public-information"
 repository_visibility: "private"
 repository_owner_type: "personal"
@@ -19,8 +19,8 @@ frozen_files:
   workflow_sha256: "018f7e727bb3bae82d7cb758ced012926364a0595a0782a91122238a16cc1e7c"
 
 portable_agent:
-  protocol_version: "1.0"
-  protocol_id: "portable-agent-1.0"
+  protocol_version: "1.1"
+  protocol_id: "portable-agent-1.1"
   mode: "user_selected_local_agent"
   required_specific_agent: false
   required_specific_model: false
@@ -30,7 +30,7 @@ portable_agent:
   isolated_output_directory: "agent_outputs"
   task_workspace_allocator: "scripts/create_task_workspace.py"
   session_gate: "required_ready_before_allocation"
-  capability_receipt: "one_use_visual_probe_and_required_capabilities"
+  capability_receipt: "one_use_visual_probe_with_declared_visual_channel"
   canonical_renderer: "scripts/render_report.py"
   unexpected_formal_artifacts: "rejected"
   claim_evidence: "required_schema_1.0"
@@ -46,8 +46,10 @@ portable_agent:
   launcher_runtime: "python_no_downloaded_ps1"
   preflight_command: "python scripts/check_agent_workspace.py"
   self_test_command: "START_AGENT.cmd -SelfTest"
-  validated_hosts_for_protocol: "portable-agent-1.0"
+  validated_hosts_for_protocol: "portable-agent-1.1"
   validated_hosts:
+    - "claude_code_deepseek_human_visual_probe_qwen3vl_page_qa"
+  validated_hosts_for_protocol_1_0:
     - "opencode_1.18.15_deepseek_chat_safe_stop"
     - "codex_desktop_direct_image_gate_and_document_pipeline"
   previously_validated_hosts_for_protocol_0_9:

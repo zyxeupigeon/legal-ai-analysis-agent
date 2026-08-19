@@ -20,7 +20,7 @@ from session_preflight_gate import consume_capability_receipt, validate_capabili
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_ROOT = PROJECT_ROOT / "agent_outputs"
-PROTOCOL_ID = "portable-agent-1.0"
+PROTOCOL_ID = "portable-agent-1.1"
 TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
 PROTECTED_FIXED_PATHS = (
     "PROJECT_AGENT_PROTOCOL.md",
@@ -109,6 +109,8 @@ def allocate(task_id: str, session_gate: str, capability_receipt: Path) -> Path:
         "session_capability_receipt_id": receipt["receipt_id"],
         "session_capabilities": receipt["capabilities"],
         "visual_probe_verified": receipt["visual_probe_verified"],
+        "visual_channel": receipt.get("visual_channel"),
+        "visual_channel_evidence_sha256": receipt.get("visual_channel_evidence_sha256"),
         "document_self_test": receipt["document_self_test"],
         "protected_project_hashes": project_hashes,
     }

@@ -64,7 +64,7 @@ def test_agent_adapters_repeat_scope_boundary() -> None:
 
 def test_public_information_release_metadata_and_guide() -> None:
     manifest = read("VERSION_MANIFEST.yaml")
-    assert 'project_phase: "P3.8"' in manifest
+    assert 'project_phase: "P3.9"' in manifest
     assert 'canonical_domain_glossary: "CONTEXT.md"' in manifest
     assert 'release_channel: "public-information"' in manifest
     assert "target_product_function_testing_allowed: false" in manifest

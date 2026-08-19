@@ -8,7 +8,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-PROTOCOL_ID = "portable-agent-1.0"
+PROTOCOL_ID = "portable-agent-1.1"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 

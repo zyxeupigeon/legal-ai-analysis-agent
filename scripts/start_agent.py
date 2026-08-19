@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PROTOCOL_ID = "portable-agent-1.0"
+PROTOCOL_ID = "portable-agent-1.1"
 
 
 def executable_command(path: str, *args: str) -> list[str]:

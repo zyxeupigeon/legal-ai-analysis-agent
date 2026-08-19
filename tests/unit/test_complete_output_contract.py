@@ -44,8 +44,8 @@ def write_capability_receipt() -> Path:
     receipt_id = uuid.uuid4().hex
     path = receipt_dir / f"{receipt_id}.json"
     path.write_text(json.dumps({
-        "schema_version": "1.0",
-        "protocol_id": "portable-agent-1.0",
+        "schema_version": "1.1",
+        "protocol_id": "portable-agent-1.1",
         "receipt_id": receipt_id,
         "challenge_id": "unit-test",
         "project_root": str(REPO_ROOT.resolve()),
@@ -54,6 +54,7 @@ def write_capability_receipt() -> Path:
         "used_at": None,
         "used_for_task_id": None,
         "visual_probe_verified": True,
+        "visual_channel": "human",
         "document_self_test": "READY",
         "capabilities": {
             "internet_search": "READY",

@@ -46,7 +46,7 @@ def test_task_workspace_is_anchored_to_current_project(monkeypatch, tmp_path):
     context = json.loads((output_dir / "task_context.json").read_text(encoding="utf-8"))
     assert Path(context["project_root"]) == project_root
     assert Path(context["task_output_dir"]) == output_dir
-    assert context["protocol_id"] == "portable-agent-1.0"
+    assert context["protocol_id"] == "portable-agent-1.1"
     assert context["session_gate"] == "READY"
     assert context["visual_probe_verified"] is True
     assert context["session_capabilities"]["direct_image_inspection"] == "READY"

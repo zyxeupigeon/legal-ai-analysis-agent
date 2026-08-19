@@ -87,7 +87,7 @@ def create_task(
     task_dir = output_root / task_id
     (task_dir / "render").mkdir(parents=True)
     context = {
-        "protocol_id": "portable-agent-1.0",
+        "protocol_id": "portable-agent-1.1",
         "project_root": str(project_root.resolve()),
         "output_root": str(output_root.resolve()),
         "task_output_dir": str(task_dir.resolve()),

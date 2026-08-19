@@ -35,6 +35,8 @@ def ready_args(challenge_id: str, visual_code: str) -> argparse.Namespace:
     return argparse.Namespace(
         challenge_id=challenge_id,
         visual_code=visual_code,
+        visual_channel="human",
+        visual_channel_evidence=None,
         internet_search="READY",
         page_reading="READY",
         word_generation="READY",
@@ -51,6 +53,7 @@ def test_visual_probe_creates_one_use_bound_receipt(monkeypatch, tmp_path) -> No
     receipt_path = gate.verify_challenge(ready_args(challenge_id, "123456"))
     receipt = gate.validate_capability_receipt(receipt_path, project_root)
     assert receipt["visual_probe_verified"] is True
+    assert receipt["visual_channel"] == "human"
     assert receipt["capabilities"]["direct_image_inspection"] == "READY"
 
     consumed = gate.consume_capability_receipt(receipt_path, "task-1", project_root)
@@ -78,4 +81,52 @@ def test_receipt_from_another_project_is_rejected(monkeypatch, tmp_path) -> None
     receipt_path.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(ValueError, match="another project copy"):
+        gate.validate_capability_receipt(receipt_path, project_root)
+
+
+def test_non_human_channel_requires_evidence(monkeypatch, tmp_path) -> None:
+    configure_gate(monkeypatch, tmp_path)
+    challenge_id, _ = gate.prepare_challenge()
+    args = argparse.Namespace(
+        challenge_id=challenge_id,
+        visual_code="123456",
+        visual_channel="qwen3-vl-plus",
+        visual_channel_evidence=None,
+        internet_search="READY",
+        page_reading="READY",
+        word_generation="READY",
+        pdf_png_rendering="READY",
+    )
+    with pytest.raises(ValueError, match="visual-channel-evidence"):
+        gate.verify_challenge(args)
+    assert not list(gate.RECEIPT_ROOT.glob("*.json"))
+
+
+def test_missing_visual_channel_is_rejected(monkeypatch, tmp_path) -> None:
+    configure_gate(monkeypatch, tmp_path)
+    challenge_id, _ = gate.prepare_challenge()
+    args = argparse.Namespace(
+        challenge_id=challenge_id,
+        visual_code="123456",
+        visual_channel=None,
+        visual_channel_evidence=None,
+        internet_search="READY",
+        page_reading="READY",
+        word_generation="READY",
+        pdf_png_rendering="READY",
+    )
+    with pytest.raises(ValueError, match="visual channel must be declared"):
+        gate.verify_challenge(args)
+
+
+def test_receipt_without_visual_channel_is_rejected(monkeypatch, tmp_path) -> None:
+    project_root = configure_gate(monkeypatch, tmp_path)
+    challenge_id, _ = gate.prepare_challenge()
+    receipt_path = gate.verify_challenge(ready_args(challenge_id, "123456"))
+    payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+    payload["visual_channel"] = "qwen3-vl-plus"
+    payload.pop("visual_channel_evidence_sha256", None)
+    receipt_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="evidence SHA-256"):
         gate.validate_capability_receipt(receipt_path, project_root)

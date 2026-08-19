@@ -1,6 +1,6 @@
 # 法律AI产品分析项目 Agent 协议
 
-协议编号：portable-agent-1.0
+协议编号：portable-agent-1.1
 
 ## 目的
 
@@ -48,7 +48,31 @@
 - 生成可编辑 `.docx`；
 - 将最终 Word 渲染为 PDF 和逐页图片并进行版式检查。
 
-浏览器、MCP、插件和具体搜索服务都只是实现方式，不是项目硬性依赖。若 Agent 没有网页检索与正文读取能力，可以要求使用者启用相应工具；在能力补足前必须停止事实研究。
+浏览器、MCP、插件和具体搜索服务都只是实现方式，不是项目硬性依赖。若 Agent 没有网页检索与正文读取能力，可以要求使用者启用相应工具；在能力补足前必须停止事实研究。视觉检查能力同样可以通过经批准的适配通道补足（见「能力适配边界」），通道调用记录必须可审计；在视觉通道补足前不得声明 READY 或 PASS。
+
+### 能力适配边界
+
+视觉检查、网页检索与正文读取属于可适配能力：若当前会话模型自身不具备，可使用经批准的能力适配通道补足；通道是"实现方式"，与浏览器、搜索服务同级，不是项目硬性依赖。
+
+**可适配能力**：联网检索、网页正文读取、视觉检查（direct image inspection）。
+**不可适配能力**（缺失即 BLOCKED，任何通道不得补足）：目标产品注册、登录、付费、API 调用、文件上传；事实核验与来源绑定；对目标产品能力作实测结论。报告过程中任何环节都不得通过外部通道接触目标产品账户、密钥或受限内容。
+
+**经批准的视觉适配通道必须同时满足以下全部条件**，否则不得视为 READY：
+
+1. 真实读取图片字节并输出基于图像内容的描述，不得从文件名、路径、哈希、几何推断或会话内既有知识输出结论；
+2. 输出可审计：通道调用记录（图像 SHA-256、通道标识、调用时间、返回原文）必须随执行轨迹保存，可复现复核；
+3. 执行者显式登记：探针读码与页面质检必须声明实际执行通道（如 human、qwen3-vl-plus），写入 capability receipt 与任务上下文；
+4. 使用者最终确认：页面质检结论必须由使用者人工确认后方可作为 PASS 依据（见交付要求）。
+
+通道不可用时（API 失效、密钥过期、网络中断、输出不可信）等同视觉能力不可用：必须 BLOCKED 或转人工，不得静默降级为"无质检 PASS"。
+
+报告中任何能力声明必须拆分主模型能力与通道能力：`capability_declaration` 不得把通道能力记为主模型自身能力。
+
+**通道登记流程**：
+
+- 通道登记是**项目维护动作**，由使用者发起并最终确认；运行任务的 Agent 不得在报告任务期间自行登记新通道、修改通道清单或任何门禁相关文件（见「不得违反的规则」）。
+- 新通道登记前，必须由使用者（或使用者指定的独立维护会话）验证其满足上述全部四条件，并记录：通道标识、实现方式（脚本/服务）、版本或调用方式、验证日期与验证者；登记记录统一写入 `docs/VISUAL_CHANNEL_REGISTRY.md`。
+- 运行任务的 Agent 遇到使用者希望使用但**未登记**的视觉通道时，必须停止该环节并报告"此通道未登记，按协议不得作为探针或质检通道使用"，给出选项：使用者人工复核，或使用者先完成通道登记后再继续；不得自行放行、不得自行登记。
 
 ## 不得违反的规则
 
@@ -76,6 +100,12 @@
 4. 对话交付：最终回复中的简明交接信息，至少列出关键文件绝对路径及报告流程状态。
 
 完整任务至少交付：可编辑 Word 报告、来源记录、逐条主张证据账本 `claim_evidence.json`、真实执行轨迹 `execution_trace.json`、能力声明、研究边界和未解决问题、最终Word的PDF与逐页图片、视觉检查结果、运行摘要、任务上下文文件、过程优化报告、版本差异 `report_diff.json` / `report_diff.md`、防篡改产物清单 `report_manifest.json`，以及本次使用的 Agent、模型（若可知）、工具能力和协议编号。
+
+能力声明与视觉质检确认必须满足：
+
+- 能力声明必须拆分主模型能力与适配通道能力（例如：研究/生成 = deepseek-v4-flash；视觉质检 = qwen3-vl-plus 通道 + 使用者人工确认），不得把通道能力记为主模型自身能力；
+- 视觉质检结果必须注明执行通道，并由使用者人工确认后方可作为 PASS 依据；
+- 使用者人工确认的执行方式：渲染完成后 Agent 出示渲染页路径与（如有）通道质检结果，使用者在同一会话内给出确认或问题反馈；确认动作（内容、时间）记录进执行轨迹或视觉检查结果，且必须先于 PASS 判定。不要求另开会话；未确认前不得封存 PASS。
 
 过程优化报告固定命名为 `process_optimization_report.md`，必须在正式报告完成质检后、最终回复前由 `scripts/build_process_optimization_report.py` 按照 `docs/PROCESS_OPTIMIZATION_REPORT_TEMPLATE.md` 从已封存轨迹生成。它只记录本次真实执行过程，至少包括：各阶段真实时间、实际工具与来源路径、失败和重试、主要瓶颈、无效或重复步骤、质量风险、可复用做法，以及按“收益/实现成本/风险”排序的下一轮优化建议。不得手工编造耗时，不得包含密钥、认证信息或用户敏感材料。该文件用于改进项目流程，不得混入正式 Word 正文。
 
@@ -109,7 +139,7 @@ Agent不得仅根据自身执行计划或工具返回值宣称任务通过。必
 
 1. 在分配的绝对任务目录生成Word、来源记录、`claim_evidence.json` 和运行摘要草稿。高风险动态事实（当前模型/产品版本、价格、运营主体、政策状态）必须逐条绑定本轮实际读取的一级官方来源；未核验事实不得进入正文。
 2. 从最终Word重新生成PDF与逐页图片。
-3. 独立查看最终版全部页面，记录裁切、重叠、缺字、表格越界、异常空白和分页问题，并完成必要修复。所有数据表的首行必须设置为跨页重复表头；跨页后失去列含义不得通过验收。
+3. 独立查看最终版全部页面（查看方式可为会话视觉、经批准的适配通道或使用者复核，须在视觉检查结果中注明实际执行者），记录裁切、重叠、缺字、表格越界、异常空白和分页问题，并完成必要修复。所有数据表的首行必须设置为跨页重复表头；跨页后失去列含义不得通过验收。
 4. 闭合所有执行事件、记录至少一条优化建议并封存 `execution_trace.json`，再由项目生成器创建与轨迹SHA-256绑定的 `process_optimization_report.md`。
 5. 生成 `report_diff.json` 和 `report_diff.md`；若存在同一对象且清单有效的最近历史任务，自动比较主张、分析结论、高时效事实、来源和执行效率，否则建立首次基线。
 6. 生成 `report_manifest.json`，封存核心产物的任务相对路径、大小和SHA-256；清单必须晚于其覆盖的差异及报告产物。
@@ -117,11 +147,11 @@ Agent不得仅根据自身执行计划或工具返回值宣称任务通过。必
 8. 运行项目提供的确定性输出验收器；有测试对象配置时必须加载对应profile。验收器的结构性 `OK` 不等同于总体 `PASS`，最终状态以运行摘要中如实声明的 PASS、PARTIAL 或 FAIL 为准。
 9. 只有确定性验收、独立视觉检查、过程优化报告、版本差异和产物清单均完成，运行摘要才可写总体PASS；否则必须写FAIL或PARTIAL并列出缺口。
 
-## Portable-agent 1.0 hard gates
+## Portable-agent 1.1 hard gates
 
-1. Before declaring `SESSION_PREFLIGHT_READY`, run `python scripts/session_preflight_gate.py prepare`. Open the emitted `PROBE_IMAGE` with the same direct image-view capability that will be used for final report pages. Do not obtain the code from OCR, PDF geometry, source files, hashes, or another model.
+1. Before declaring `SESSION_PREFLIGHT_READY`, run `python scripts/session_preflight_gate.py prepare`. Read the emitted `PROBE_IMAGE` with the direct image-view capability this session will use for final report pages: the session model's own vision, an approved visual adapter channel (see 能力适配边界), or the user's own eyes. The actual reader must be named in the capability receipt (`--visual-channel`). Do not obtain the code from OCR, PDF geometry, source files, hashes, or from any model/tool that is not the declared visual channel. When the code comes from an approved adapter channel, its call record (probe image SHA-256, channel id, timestamp, raw output) must be kept with the execution trace and verifiable.
 2. After direct image inspection and real tests of internet search plus full-page reading, run `python scripts/session_preflight_gate.py verify --challenge-id <CHALLENGE_ID> --visual-code <SIX_DIGIT_CODE> --internet-search READY --page-reading READY --word-generation READY --pdf-png-rendering READY`. A successful command emits a one-use `CAPABILITY_RECEIPT`.
-3. If direct image inspection, full-page reading, permissions, or any other required capability is unavailable in the current continuous session, declare `SESSION_PREFLIGHT_BLOCKED`. Target-product authentication is outside this project and is never a READY requirement. Geometry-only PDF checks are not a substitute for direct final-page inspection and must not be used to declare READY or PASS.
+3. If direct image inspection (including every approved visual adapter channel), full-page reading, permissions, or any other required capability is unavailable in the current continuous session, declare `SESSION_PREFLIGHT_BLOCKED`. A channel that fails, is unreachable, or cannot be verified does not count as available; do not silently downgrade to an uninspected PASS. Target-product authentication is outside this project and is never a READY requirement. Geometry-only PDF checks are not a substitute for direct final-page inspection and must not be used to declare READY or PASS.
 4. Task allocation requires the one-use capability receipt. A receipt from another project copy, an expired receipt, or a consumed receipt must be rejected.
 5. Generate the editable report directly as `<TASK_OUTPUT_DIR>/report.docx`. Render it only with `python scripts/render_report.py "<TASK_OUTPUT_DIR>"`; this command owns the rendering execution event, records failures, links retries, and writes only `render/report.pdf` plus `render/page-*.png`.
 6. Every failed or blocked execution attempt must be closed immediately with its real status before retrying. A finalized trace containing a failed or blocked event must include a `failure` observation, so the process optimization report cannot state that no failure occurred.

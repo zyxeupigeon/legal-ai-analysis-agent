@@ -16,8 +16,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
-PROTOCOL_ID = "portable-agent-1.0"
-SCHEMA_VERSION = "1.0"
+PROTOCOL_ID = "portable-agent-1.1"
+SCHEMA_VERSION = "1.1"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 GATE_ROOT = PROJECT_ROOT / "tmp" / "session_preflight"
 CHALLENGE_ROOT = GATE_ROOT / "challenges"
@@ -159,6 +159,20 @@ def verify_challenge(args: argparse.Namespace) -> Path:
         raise ValueError("challenge expired; prepare a new session probe")
     if payload.get("visual_code_sha256") != challenge_digest(args.challenge_id, args.visual_code):
         raise ValueError("visual code is incorrect; do not declare READY without direct image inspection")
+    visual_channel = (args.visual_channel or "").strip()
+    if not visual_channel:
+        raise ValueError("a visual channel must be declared with --visual-channel")
+    if visual_channel != "human":
+        if not args.visual_channel_evidence:
+            raise ValueError(
+                "non-human visual channels require --visual-channel-evidence "
+                "(channel call record with probe image SHA-256)"
+            )
+        evidence_path = Path(args.visual_channel_evidence).resolve()
+        if not evidence_path.is_file():
+            raise ValueError(f"visual channel evidence file not found: {evidence_path}")
+    else:
+        evidence_path = None
     declarations = {
         "internet_search": args.internet_search,
         "page_reading": args.page_reading,
@@ -182,6 +196,11 @@ def verify_challenge(args: argparse.Namespace) -> Path:
     receipt_id = secrets.token_hex(16)
     now = utc_now()
     receipt_path = RECEIPT_ROOT / f"{receipt_id}.json"
+    evidence_sha256 = (
+        hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+        if evidence_path is not None
+        else None
+    )
     atomic_write_json(receipt_path, {
         "schema_version": SCHEMA_VERSION,
         "protocol_id": PROTOCOL_ID,
@@ -193,6 +212,8 @@ def verify_challenge(args: argparse.Namespace) -> Path:
         "used_at": None,
         "used_for_task_id": None,
         "visual_probe_verified": True,
+        "visual_channel": visual_channel,
+        "visual_channel_evidence_sha256": evidence_sha256,
         "document_self_test": "READY",
         "capabilities": declarations,
     })
@@ -221,6 +242,15 @@ def validate_capability_receipt(
         raise ValueError("capability receipt was already used")
     if payload.get("visual_probe_verified") is not True:
         raise ValueError("capability receipt has no verified visual probe")
+    visual_channel = payload.get("visual_channel")
+    if not isinstance(visual_channel, str) or not visual_channel.strip():
+        raise ValueError("capability receipt has no declared visual channel")
+    if visual_channel != "human":
+        evidence_sha256 = payload.get("visual_channel_evidence_sha256")
+        if not isinstance(evidence_sha256, str) or len(evidence_sha256) != 64:
+            raise ValueError(
+                "capability receipt for a non-human visual channel has no evidence SHA-256"
+            )
     if payload.get("document_self_test") != "READY":
         raise ValueError("capability receipt has no successful document self-test")
     capabilities = payload.get("capabilities")
@@ -247,6 +277,16 @@ def build_parser() -> argparse.ArgumentParser:
     verify = commands.add_parser("verify")
     verify.add_argument("--challenge-id", required=True)
     verify.add_argument("--visual-code", required=True)
+    verify.add_argument(
+        "--visual-channel",
+        required=True,
+        help="actual reader of the probe image: 'human' or an approved visual adapter channel id",
+    )
+    verify.add_argument(
+        "--visual-channel-evidence",
+        default=None,
+        help="path to the channel call record JSON (required unless --visual-channel human)",
+    )
     for option in ("internet-search", "page-reading", "word-generation", "pdf-png-rendering"):
         verify.add_argument(f"--{option}", required=True, choices=("READY", "BLOCKED"))
     return parser

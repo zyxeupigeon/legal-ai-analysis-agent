@@ -13,7 +13,7 @@ from pathlib import Path
 
 MANIFEST_SCHEMA_VERSION = "1.0"
 DIFF_SCHEMA_VERSION = "1.0"
-PROTOCOL_ID = "portable-agent-1.0"
+PROTOCOL_ID = "portable-agent-1.1"
 FINAL_STATUSES = {"PASS", "PARTIAL", "FAIL"}
 DYNAMIC_CATEGORIES = {
     "current_model_version",

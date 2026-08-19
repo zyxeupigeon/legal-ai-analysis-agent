@@ -1,5 +1,17 @@
 # 变更记录
 
+## 1.10.0 - 2026-08-19
+
+- 协议升级为 `portable-agent-1.1`、项目阶段升级为 P3.9，新增「能力适配边界」：视觉检查（direct image inspection）与网页检索、正文读取并列，可通过经批准的能力适配通道补足；目标产品访问、事实核验、来源绑定仍为不可适配能力，缺失必须 BLOCKED。
+- hard gate 1 探针码来源规则修订：可由会话模型自身视觉、经批准的视觉适配通道或使用者人眼读取，但必须在 capability receipt 中声明 `--visual-channel`；从 OCR、PDF 几何、源文件、哈希或**非声明通道**获取仍被禁止。
+- 视觉适配通道必须满足四条件（真实读图、可审计调用记录、执行者登记、使用者最终确认）；通道登记是项目维护动作，运行任务的 Agent 不得自行登记。
+- capability receipt 新增 `visual_channel` 与 `visual_channel_evidence_sha256` 字段；非 human 通道必须附带通道调用记录。
+- 页面质检结论必须由使用者人工确认（同会话确认即可、记录在案、先于 PASS）方可作为 PASS 依据；能力声明必须拆分主模型能力与通道能力。
+- 新增 `scripts/visual_qa_dashscope.py --read-probe` 探针读码模式，输出可核验的通道调用记录（图像 SHA-256、通道标识、时间戳、返回原文）。
+- 实测：`qwen3-vl-plus` 读点阵探针码多次哈希校验失败（`17663`/`172653`/`096347` 均未通过），判定探针环节固定使用 human 人工通道（实测签发 receipt 成功）；页面质检通道验证通过（legora 报告 9 页）。
+- 端到端验证：`legora-20260819`（protocol 1.1）总体 PASS——human 探针签发一次性凭证 + qwen3-vl-plus 通道页面质检 + 使用者人工确认；`VERSION_MANIFEST.yaml` `validated_hosts` 登记为 `claude_code_deepseek_human_visual_probe_qwen3vl_page_qa`。
+- 待办：1.1 的 validated_hosts 尚为空白，需完成堵法有效性测试用例后再登记验证记录。
+
 ## 1.9.0 - 2026-08-18
 
 - 项目阶段升级为P3.8公开信息分析语义统一版，新增规范词表 `CONTEXT.md`，统一项目协议、Agent 核心规范、使用说明和验收测试中的业务语言。
