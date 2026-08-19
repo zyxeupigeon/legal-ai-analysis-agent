@@ -1,5 +1,5 @@
-manifest_version: "1.7"
-project_phase: "P3.7"
+manifest_version: "1.9"
+project_phase: "P3.8"
 release_channel: "public-information"
 repository_visibility: "private"
 repository_owner_type: "personal"
@@ -15,8 +15,8 @@ skill:
   source_sha256: "f7c502fa4908981276f1e0001fcc6b8572ad183a2c5848d9fd5acec33c5b72d4"
 
 frozen_files:
-  system_prompt_sha256: "8e7b7156d2c1443020745b60e86b7f8370143f59f6be39a738d3be8977eaa379"
-  workflow_sha256: "b3788e07695dff9af1a15a296d729b25450bd08459845f5c40a9e9b3e3b7bfa3"
+  system_prompt_sha256: "cfff8516317d9f9297e6787242cbb51577acfba54b72923f7cb643f2a1061ede"
+  workflow_sha256: "018f7e727bb3bae82d7cb758ced012926364a0595a0782a91122238a16cc1e7c"
 
 portable_agent:
   protocol_version: "1.0"
@@ -59,6 +59,10 @@ portable_agent:
   safe_stop_automated_validation: "passed"
   safe_stop_live_validation: "passed_opencode_deepseek_chat_no_task_created"
   public_information_readiness: "ready_for_use"
+  canonical_domain_glossary: "CONTEXT.md"
+  audience_contract: "first-time_non-specialist_reader"
+  report_success_status: "PASS_PARTIAL_FAIL_pipeline_only"
+  delivery_layers: "primary_audit_rendering_conversation"
 
 data_policy:
   public_research_allowed: true
