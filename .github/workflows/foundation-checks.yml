@@ -22,8 +22,8 @@ jobs:
           for path in README.md PROJECT_STRUCTURE.md VERSION_MANIFEST.yaml CHANGELOG.md PROJECT_AGENT_PROTOCOL.md START_AGENT.cmd scripts/create_task_workspace.py scripts/check_agent_workspace.py scripts/session_preflight_gate.py scripts/self_test_document_pipeline.py scripts/start_agent.py scripts/execution_trace_lib.py scripts/record_execution_event.py scripts/build_process_optimization_report.py scripts/report_version_lib.py scripts/compare_report_versions.py scripts/build_report_manifest.py scripts/render_report.py scripts/validate_portable_agent_output.py docs/EXECUTION_TRACE_SCHEMA.md docs/REPORT_VERSIONING.md docs/PROCESS_OPTIMIZATION_REPORT_TEMPLATE.md 项目成果展示与使用说明.md; do
             test -f "$path" || { echo "Missing $path"; exit 1; }
           done
-          grep -Fq 'project_phase: "P3.8"' VERSION_MANIFEST.yaml
-          grep -Fq 'protocol_id: "portable-agent-1.0"' VERSION_MANIFEST.yaml
+          grep -Fq 'project_phase: "P3.9"' VERSION_MANIFEST.yaml
+          grep -Fq 'protocol_id: "portable-agent-1.1"' VERSION_MANIFEST.yaml
           grep -Fq 'present_on_main: false' VERSION_MANIFEST.yaml
           test ! -f 项目成果展示与使用说明.txt
           test ! -d apps/web
